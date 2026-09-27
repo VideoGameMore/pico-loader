@@ -140,7 +140,8 @@ copyLauncherPath:
 
     // For the hotkey path, launch the preserved launcher as a normal ROM instead
     // of setting the SDK-reset marker that would reload the current retail game.
-    cmp r8, #0
+    mov r1, r8
+    cmp r1, #0
     beq setupBootState
 
     movs r0, #0x70
@@ -179,7 +180,8 @@ setupBootState:
 
     movs r2, #0x41
     lsls r2, r2, #4 // 0x410
-    cmp r8, #0
+    mov r1, r8
+    cmp r1, #0
     beq storeCheats
     movs r7, #0 // Don't carry a retail game's cheats into the launcher.
 storeCheats:
@@ -187,7 +189,8 @@ storeCheats:
 
     // A normal SDK reset sets the marker consumed by arm7/main.cpp.
     // A hotkey return deliberately leaves the retail ARM7 entry untouched.
-    cmp r8, #0
+    mov r1, r8
+    cmp r1, #0
     bne skipSdkResetMarker
     ldr r1, [r5] // pload_header7_t::entryPoint
     str r1, [r4] // NTR_SHARED_MEMORY->romHeader.arm7EntryAddress
