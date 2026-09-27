@@ -1,5 +1,6 @@
 #include "common.h"
 #include <memory>
+#include <string.h>
 #include "PicoLoaderArranger.h"
 
 #define PICO_LOADER_9_PATH    "/_pico/picoLoader9.bin"
@@ -27,6 +28,8 @@ bool PicoLoaderArranger::SetupPicoLoaderInfo(loader_info_t* info) const
     info->clusterShift = __builtin_ctz(file->obj.fs->csize);
     info->picoLoaderBootDrive = gLoaderHeader.bootDrive;
     info->database = file->obj.fs->database;
+    memcpy(info->launcherPath, gLoaderHeader.v2.launcherPath, sizeof(info->launcherPath));
+    info->launcherPath[sizeof(info->launcherPath) - 1] = 0;
 
     if (f_close(file.get()) != FR_OK)
     {
