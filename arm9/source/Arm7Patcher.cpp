@@ -17,6 +17,7 @@
 #include "patches/arm7/sdk5/Sdk5DsiSdCardRedirectPatch.h"
 #include "patches/arm7/PokemonDownloaderArm7Patch.h"
 #include "patches/arm7/cheats/CheatEnginePatch.h"
+#include "patches/arm7/hotkey/RetailHotkeyDetectionPatch.h"
 #include "Arm7Patcher.h"
 
 static u32 correctAddress(u32 address, const nds_header_ntr_t* romHeader)
@@ -106,6 +107,12 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
             cheatsPtr = cheats;
             patchCollection.AddPatch(new CheatEnginePatch(cheats));
             mainMemoryArenaLo += cheatsLength;
+        }
+        else
+        {
+            // Detection test only. Reuse Pico Loader's existing ARM7 VBlank
+            // patching convention instead of touching ARM9 IRQ dispatch.
+            patchCollection.AddPatch(new RetailHotkeyDetectionPatch());
         }
 
         if (romHeader->unitCode == 0) // seems only present on NITRO, not on HYBRID or LIMITED
