@@ -6,6 +6,7 @@ DEFINE_SECTION_SYMBOLS(patch_retailhotkeydetect);
 
 extern "C" void patch_retailhotkeydetect_entry_arm(void);
 extern "C" void patch_retailhotkeydetect_entry(void);
+extern const void* patch_retailhotkeydetect_arm9ReturnAddress;
 
 class RetailHotkeyDetectionPatchCode : public PatchCode
 {
