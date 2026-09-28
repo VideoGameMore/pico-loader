@@ -18,11 +18,17 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-// Nitro/TWL SDK ARM9 IRQ dispatcher signatures. The first signature is the
-// common SDK form; the alternates are used by a small number of retail titles.
-static const u32 sOSIrqHandlerPattern[] = { 0xE92D4000u, 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u };
-static const u32 sOSIrqHandlerPatternAlt[] = { 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u, 0xE14F0000u };
-static const u32 sOSIrqHandlerPatternAlt5[] = { 0xE3A0C301u, 0xE5BC2208u, 0xE1EC00D8u, 0xE3520000u };
+// Standard Nitro/TWL SDK IRQ dispatch tail. At this point r0 is the IRQ table
+// index. The two literal words immediately after these four instructions are
+// the IRQ vector table address and the SDK IRQ return address respectively.
+// Hooking here avoids modifying/replaying game-specific IRQ prologues.
+static const u32 sOSIrqDispatchTailPattern[] =
+{
+    0xE59F1008u, // ldr r1, [pc, #8]  (IRQ vector table address)
+    0xE7910100u, // ldr r0, [r1, r0, lsl #2]
+    0xE59FE004u, // ldr lr, [pc, #4]  (IRQ return address)
+    0xE12FFF10u  // bx r0
+};
 
 bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 {
@@ -86,23 +92,15 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
     // A return hotkey is only useful when the frontend supplied a launcher path.
     if (_loaderInfo && _loaderInfo->launcherPath[0] != 0)
     {
-        _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPattern, sizeof(sOSIrqHandlerPattern));
-        if (!_irqHandler)
-        {
-            _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt, sizeof(sOSIrqHandlerPatternAlt));
-        }
-        if (!_irqHandler)
-        {
-            _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt5, sizeof(sOSIrqHandlerPatternAlt5));
-        }
+        _irqHandler = patchContext.FindPattern32(sOSIrqDispatchTailPattern, sizeof(sOSIrqDispatchTailPattern));
 
         if (_irqHandler)
         {
-            LOG_DEBUG("Found ARM9 IRQ dispatcher at %p\n", _irqHandler);
+            LOG_DEBUG("Found ARM9 IRQ dispatch tail at %p\n", _irqHandler);
         }
         else
         {
-            LOG_WARNING("ARM9 IRQ dispatcher not found; retail return hotkey disabled\n");
+            LOG_WARNING("ARM9 IRQ dispatch tail not found; retail return hotkey disabled\n");
         }
     }
 
@@ -111,9 +109,6 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    // The return hotkey can work even when this particular game has no
-    // recognized OS_ResetSystem signature. Only skip the patch entirely when
-    // neither path can be installed.
     if (!_osResetSystem && !_irqHandler)
     {
         return;
@@ -166,23 +161,24 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 
     if (_irqHandler)
     {
-        u32 returnAddress = (u32)(_irqHandler + 2);
-        if (patchContext.GetAutoloadAdjuster())
-        {
-            returnAddress = patchContext.GetAutoloadAdjuster()->AdjustInitialToFinal(returnAddress);
-        }
+        // Standard dispatch tail layout:
+        //   [0..3] instructions
+        //   [4] IRQ vector table address literal
+        //   [5] SDK IRQ return address literal
+        const u32 irqTableAddress = _irqHandler[4];
+        const u32 irqReturnAddress = _irqHandler[5];
 
         auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
         (
             patchContext.GetPatchHeap(),
-            _irqHandler[0],
-            _irqHandler[1],
-            (const void*)returnAddress,
+            (const void*)irqTableAddress,
+            (const void*)irqReturnAddress,
             patchCode->GetReturnToLauncherFunction()
         );
 
-        // Replace the first two ARM instructions with an absolute jump. The
-        // hotkey patch replays both instructions before chaining back to +8.
+        // Replace the first two instructions of the dispatch tail with an
+        // absolute jump. The hook performs the hotkey check and then directly
+        // reproduces the SDK's vector-table dispatch sequence.
         _irqHandler[0] = 0xE51FF004;
         _irqHandler[1] = (u32)hotkeyPatchCode->GetEntryFunction();
     }
