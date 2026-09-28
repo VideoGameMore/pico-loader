@@ -6,56 +6,52 @@
 .global patch_retailreturnhotkey_entry
 .type patch_retailreturnhotkey_entry, %function
 patch_retailreturnhotkey_entry:
-    // Preserve the state seen by the SDK IRQ dispatcher.
-    stmdb sp!, {r0-r3, r12, lr}
+    // We enter at the tail of the SDK IRQ dispatcher. r0 contains the IRQ
+    // table index. Preserve all scratch state while checking the hotkey.
+    stmdb sp!, {r0-r3, r12}
 
-    // Only count the hotkey on VBlank IRQs so the hold time is frame based.
-    ldr r0, regIf
-    ldr r1, [r0]
-    tst r1, #1
-    beq chain_original
+    // Only count the hotkey on VBlank (IRQ table index 0), so the hold time is
+    // frame based and the check runs only once per frame.
+    cmp r0, #0
+    bne chain_original
 
     // REG_KEYINPUT is active-low. Require L + R + DOWN + SELECT.
-    ldr r0, regKeyInput
-    ldrh r1, [r0]
-    ldr r2, hotkeyMask
-    ands r1, r1, r2
+    ldr r1, regKeyInput
+    ldrh r2, [r1]
+    ldr r3, hotkeyMask
+    ands r2, r2, r3
     bne clear_counter
 
-    adr r0, holdCounter
-    ldr r1, [r0]
-    add r1, r1, #1
-    str r1, [r0]
-    cmp r1, #30
+    adr r1, holdCounter
+    ldr r2, [r1]
+    add r2, r2, #1
+    str r2, [r1]
+    cmp r2, #30
     blo chain_original
 
-    // The reset patch does not return. Restore registers first, then jump
-    // directly into Pico Loader's existing OS_ResetSystem replacement.
-    ldmia sp!, {r0-r3, r12, lr}
+    // The reset path does not return. Restore the interrupted state first,
+    // then jump into Pico Loader's return-to-launcher reset routine.
+    ldmia sp!, {r0-r3, r12}
     ldr r12, patch_retailreturnhotkey_reset_address
     bx r12
 
 clear_counter:
-    adr r0, holdCounter
-    mov r1, #0
-    str r1, [r0]
+    adr r1, holdCounter
+    mov r2, #0
+    str r2, [r1]
 
 chain_original:
-    ldmia sp!, {r0-r3, r12, lr}
-
-    // Replay the two ARM instructions replaced at the start of OS_IrqHandler.
-.global patch_retailreturnhotkey_original_instruction0
-patch_retailreturnhotkey_original_instruction0:
-    .word 0
-.global patch_retailreturnhotkey_original_instruction1
-patch_retailreturnhotkey_original_instruction1:
-    .word 0
-
-    ldr pc, patch_retailreturnhotkey_return_address
+    // Restore the register state present at the SDK dispatch tail, then
+    // reproduce the four original dispatch operations:
+    //   load IRQ vector table, load handler for r0, load IRQ return address,
+    //   and branch to the selected handler.
+    ldmia sp!, {r0-r3, r12}
+    ldr r1, patch_retailreturnhotkey_irq_table_address
+    ldr r0, [r1, r0, lsl #2]
+    ldr lr, patch_retailreturnhotkey_irq_return_address
+    bx r0
 
 .balign 4
-regIf:
-    .word 0x04000214
 regKeyInput:
     .word 0x04000130
 hotkeyMask:
@@ -63,8 +59,11 @@ hotkeyMask:
 holdCounter:
     .word 0
 
-.global patch_retailreturnhotkey_return_address
-patch_retailreturnhotkey_return_address:
+.global patch_retailreturnhotkey_irq_table_address
+patch_retailreturnhotkey_irq_table_address:
+    .word 0
+.global patch_retailreturnhotkey_irq_return_address
+patch_retailreturnhotkey_irq_return_address:
     .word 0
 .global patch_retailreturnhotkey_reset_address
 patch_retailreturnhotkey_reset_address:
