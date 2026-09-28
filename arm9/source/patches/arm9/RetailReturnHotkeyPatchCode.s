@@ -15,7 +15,7 @@ patch_retailreturnhotkey_entry:
     tst r1, #1
     beq chain_original
 
-    // REG_KEYINPUT is active-low. Require L + R + START + SELECT.
+    // REG_KEYINPUT is active-low. Require L + R + DOWN + SELECT.
     ldr r0, regKeyInput
     ldrh r1, [r0]
     ldr r2, hotkeyMask
@@ -59,7 +59,7 @@ regIf:
 regKeyInput:
     .word 0x04000130
 hotkeyMask:
-    .word 0x0000030C
+    .word 0x00000384
 holdCounter:
     .word 0
 
