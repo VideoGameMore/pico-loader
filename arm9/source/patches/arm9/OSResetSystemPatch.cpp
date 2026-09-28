@@ -111,12 +111,15 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    if (!_osResetSystem)
+    // The return hotkey can work even when this particular game has no
+    // recognized OS_ResetSystem signature. Only skip the patch entirely when
+    // neither path can be installed.
+    if (!_osResetSystem && !_irqHandler)
     {
         return;
     }
 
-    u32 offset;
+    u32 offset = 0;
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         patch_osresetsystem_arm7Entry_address = 0x02FFFE34;
@@ -155,8 +158,11 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         patchCodePart2
     );
 
-    *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
-    *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
+    if (_osResetSystem)
+    {
+        *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
+        *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
+    }
 
     if (_irqHandler)
     {
@@ -183,4 +189,3 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 
     _cheatsPointer = patchCodePart2->GetCheatsPointerAtTarget();
 }
-
