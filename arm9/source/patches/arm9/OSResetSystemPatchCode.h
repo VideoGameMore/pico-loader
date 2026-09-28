@@ -9,6 +9,7 @@ DEFINE_SECTION_SYMBOLS(patch_osresetsystem_boot);
 
 extern "C" void patch_osresetsystem_entry(void);
 extern "C" void patch_osresetsystem_returnToLauncher(void);
+extern "C" void patch_osresetsystem_returnToLauncherFromArm7(void);
 extern "C" void patch_osresetsystem_bootPicoLoader(void);
 
 extern const loader_info_t* patch_osresetsystem_loader_info_address;
@@ -57,5 +58,10 @@ public:
     const void* GetReturnToLauncherFunction() const
     {
         return GetAddressAtTarget((void*)patch_osresetsystem_returnToLauncher);
+    }
+
+    const void* GetReturnToLauncherFromArm7Function() const
+    {
+        return GetAddressAtTarget((void*)patch_osresetsystem_returnToLauncherFromArm7);
     }
 };
