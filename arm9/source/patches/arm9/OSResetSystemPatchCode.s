@@ -146,7 +146,7 @@ copyLauncherPath:
 
     movs r0, #0x70
     adds r0, r3
-    mov r2, r5
+    adds r2, r5, #0
     adds r2, #0x0C // pload_header7_t::loadParams.romPath
     movs r4, #64
 copyLauncherToRomPath:
@@ -228,7 +228,6 @@ twl_arm7_sync:
     b do_sync
 
     mov pc, lr
-
 do_sync:
     ldrh r6, [r7, #2]
     ldrh r1, [r7]
