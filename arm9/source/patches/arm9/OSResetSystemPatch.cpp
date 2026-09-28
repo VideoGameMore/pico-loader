@@ -2,8 +2,8 @@
 #include "patches/PatchContext.h"
 #include "thumbInstructions.h"
 #include "patches/platform/LoaderPlatform.h"
+#include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 #include "OSResetSystemPatchCode.h"
-#include "RetailReturnHotkeyPatchCode.h"
 #include "OSResetSystemPatch.h"
 
 static const u32 sOSResetSystemPatternSdk2Old[] = { 0xE59F101Cu, 0xE3A00010u, 0xE5815000u, 0xEB000005u };
@@ -18,16 +18,11 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-// Nitro/TWL SDK ARM9 IRQ dispatcher signatures. The first signature is the
-// common SDK form; the alternates are used by a small number of retail titles.
-static const u32 sOSIrqHandlerPattern[] = { 0xE92D4000u, 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u };
-static const u32 sOSIrqHandlerPatternAlt[] = { 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u, 0xE14F0000u };
-static const u32 sOSIrqHandlerPatternAlt5[] = { 0xE3A0C301u, 0xE5BC2208u, 0xE1EC00D8u, 0xE3520000u };
-
 bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 {
     _osResetSystem = nullptr;
-    _irqHandler = nullptr;
+    _hybrid = false;
+
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5Old, sizeof(sOSResetSystemPatternSdk5Old));
@@ -38,12 +33,14 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
         if (!_osResetSystem)
         {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5HybridOld, sizeof(sOSResetSystemPatternSdk5HybridOld));
-            _hybrid = true;
+            if (_osResetSystem)
+                _hybrid = true;
         }
         if (!_osResetSystem)
         {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5HybridNew, sizeof(sOSResetSystemPatternSdk5HybridNew));
-            _hybrid = true;
+            if (_osResetSystem)
+                _hybrid = true;
         }
     }
     else
@@ -83,40 +80,25 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
         LOG_DEBUG("OS_ResetSystem not found\n");
     }
 
-    // A return hotkey is only useful when the frontend supplied a launcher path.
-    if (_loaderInfo && _loaderInfo->launcherPath[0] != 0)
-    {
-        _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPattern, sizeof(sOSIrqHandlerPattern));
-        if (!_irqHandler)
-        {
-            _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt, sizeof(sOSIrqHandlerPatternAlt));
-        }
-        if (!_irqHandler)
-        {
-            _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt5, sizeof(sOSIrqHandlerPatternAlt5));
-        }
-
-        if (_irqHandler)
-        {
-            LOG_DEBUG("Found ARM9 IRQ dispatcher at %p\n", _irqHandler);
-        }
-        else
-        {
-            LOG_WARNING("ARM9 IRQ dispatcher not found; retail return hotkey disabled\n");
-        }
-    }
-
+    // This patch is optional. Even when OS_ResetSystem is absent, the ARM7
+    // hotkey can use the same loader machinery without modifying ARM9 IRQ code.
     return true;
 }
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    if (!_osResetSystem)
+    const bool hasLauncher = _loaderInfo && _loaderInfo->launcherPath[0] != 0;
+
+    // This is the source-template value later copied into the ARM7 hotkey patch.
+    // Leave it null unless we successfully build a return-to-launcher target.
+    patch_retailhotkeydetect_arm9ReturnAddress = nullptr;
+
+    if (!_osResetSystem && !hasLauncher)
     {
         return;
     }
 
-    u32 offset;
+    u32 offset = 0;
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         patch_osresetsystem_arm7Entry_address = 0x02FFFE34;
@@ -155,32 +137,23 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         patchCodePart2
     );
 
-    *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
-    *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
-
-    if (_irqHandler)
+    // Preserve the game's normal SDK reset behavior whenever its reset routine
+    // is known. This path still reloads the current retail title (mode 0).
+    if (_osResetSystem)
     {
-        u32 returnAddress = (u32)(_irqHandler + 2);
-        if (patchContext.GetAutoloadAdjuster())
-        {
-            returnAddress = patchContext.GetAutoloadAdjuster()->AdjustInitialToFinal(returnAddress);
-        }
+        *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
+        *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
+    }
 
-        auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
-        (
-            patchContext.GetPatchHeap(),
-            _irqHandler[0],
-            _irqHandler[1],
-            (const void*)returnAddress,
-            patchCode->GetReturnToLauncherFunction()
-        );
-
-        // Replace the first two ARM instructions with an absolute jump. The
-        // hotkey patch replays both instructions before chaining back to +8.
-        _irqHandler[0] = 0xE51FF004;
-        _irqHandler[1] = (u32)hotkeyPatchCode->GetEntryFunction();
+    // The proven ARM7 VBlank detector will embed this ARM-state entry address.
+    // No ARM9 IRQ dispatcher/vector code is modified for the hotkey.
+    if (hasLauncher)
+    {
+        patch_retailhotkeydetect_arm9ReturnAddress =
+            patchCode->GetReturnToLauncherFromArm7Function();
+        LOG_DEBUG("ARM7 retail return target prepared at %p\n",
+            patch_retailhotkeydetect_arm9ReturnAddress);
     }
 
     _cheatsPointer = patchCodePart2->GetCheatsPointerAtTarget();
 }
-
