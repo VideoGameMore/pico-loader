@@ -18,10 +18,10 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-// Standard Nitro/TWL SDK IRQ dispatch tail. At this point r0 is the IRQ table
-// index. The two literal words immediately after these four instructions are
-// the IRQ vector table address and the SDK IRQ return address respectively.
-// Hooking here avoids modifying/replaying game-specific IRQ prologues.
+// Standard Nitro/TWL SDK IRQ dispatch tail. The first literal word immediately
+// after these four instructions is the IRQ vector table address. We use the
+// dispatcher only to locate that table; the dispatcher code itself is left
+// completely untouched.
 static const u32 sOSIrqDispatchTailPattern[] =
 {
     0xE59F1008u, // ldr r1, [pc, #8]  (IRQ vector table address)
@@ -96,7 +96,7 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
         if (_irqHandler)
         {
-            LOG_DEBUG("Found ARM9 IRQ dispatch tail at %p\n", _irqHandler);
+            LOG_DEBUG("Found ARM9 IRQ vector table through dispatch tail at %p\n", _irqHandler);
         }
         else
         {
@@ -161,26 +161,28 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 
     if (_irqHandler)
     {
-        // Standard dispatch tail layout:
-        //   [0..3] instructions
-        //   [4] IRQ vector table address literal
-        //   [5] SDK IRQ return address literal
-        const u32 irqTableAddress = _irqHandler[4];
-        const u32 irqReturnAddress = _irqHandler[5];
+        // The dispatch tail's first literal is the live IRQ vector table. Entry
+        // zero is VBlank. Wrap only that callback and leave the dispatcher and
+        // every other IRQ path untouched.
+        auto irqTable = (u32*)_irqHandler[4];
+        const u32 originalVBlankAddress = irqTable[0];
 
-        auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
-        (
-            patchContext.GetPatchHeap(),
-            (const void*)irqTableAddress,
-            (const void*)irqReturnAddress,
-            patchCode->GetReturnToLauncherFunction()
-        );
+        if (originalVBlankAddress != 0)
+        {
+            auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
+            (
+                patchContext.GetPatchHeap(),
+                (const void*)originalVBlankAddress,
+                patchCode->GetReturnToLauncherFunction()
+            );
 
-        // Replace the first two instructions of the dispatch tail with an
-        // absolute jump. The hook performs the hotkey check and then directly
-        // reproduces the SDK's vector-table dispatch sequence.
-        _irqHandler[0] = 0xE51FF004;
-        _irqHandler[1] = (u32)hotkeyPatchCode->GetEntryFunction();
+            irqTable[0] = (u32)hotkeyPatchCode->GetEntryFunction();
+            LOG_DEBUG("Wrapped ARM9 VBlank handler %p with retail return hotkey\n", (void*)originalVBlankAddress);
+        }
+        else
+        {
+            LOG_WARNING("ARM9 VBlank handler is null; retail return hotkey disabled\n");
+        }
     }
 
     _cheatsPointer = patchCodePart2->GetCheatsPointerAtTarget();
