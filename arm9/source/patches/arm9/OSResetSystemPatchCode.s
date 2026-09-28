@@ -13,10 +13,26 @@ patch_osresetsystem_entry:
 .type patch_osresetsystem_returnToLauncher, %function
 patch_osresetsystem_returnToLauncher:
     movs r0, #1
+    b patch_osresetsystem_entry_common
+
+// Entry used when ARM7 initiated the reset through the retail SDK FIFO reset
+// protocol. The first ARM7/ARM9 reset handshake has already completed, so this
+// path skips resetting ARM7 again and later signals the ARM7 wait stub with 3.
+.balign 4
+.arm
+.global patch_osresetsystem_returnToLauncherFromArm7
+.type patch_osresetsystem_returnToLauncherFromArm7, %function
+patch_osresetsystem_returnToLauncherFromArm7:
+    adr r12, patch_osresetsystem_returnToLauncherFromArm7_thumb + 1
+    bx r12
+
+.thumb
+patch_osresetsystem_returnToLauncherFromArm7_thumb:
+    movs r0, #2
 
 patch_osresetsystem_entry_common:
-    // r8 survives the SD read calls and tells part 2 whether this is a
-    // normal SDK reset or an explicit return-to-launcher request.
+    // r8 survives the SD read calls and tells part 2 which reset path is active:
+    // 0 = normal SDK reset, 1 = ARM9 return-to-launcher, 2 = ARM7 hotkey return.
     mov r8, r0
 
     adr r0, regIpcSync
@@ -26,6 +42,12 @@ patch_osresetsystem_entry_common:
     // r9 = readSdSectors_address
     mov r9, r4
     mov r10, r7
+
+    // An ARM7-initiated reset has already synchronized and reset ARM9 through
+    // the retail SDK FIFO handler, so don't issue a second ARM7 reset command.
+    mov r2, r8
+    cmp r2, #2
+    beq arm7_reset_complete
 
     // reset arm7
 1:
@@ -45,6 +67,7 @@ patch_osresetsystem_entry_jump_to_twl_arm7_sync:
     cmp r7, #1
     bne 2b // while ipc sync from arm7 is not 1
 
+arm7_reset_complete:
     adds r0, #(0x04000240 - 0x04000180)
 
     // map vram ABCD to LCDC
@@ -138,8 +161,8 @@ copyLauncherPath:
     subs r4, #1
     bne copyLauncherPath
 
-    // For the hotkey path, launch the preserved launcher as a normal ROM instead
-    // of setting the SDK-reset marker that would reload the current retail game.
+    // For either hotkey path, launch the preserved launcher as a normal ROM
+    // instead of setting the SDK-reset marker that reloads the retail game.
     mov r1, r8
     cmp r1, #0
     beq setupBootState
@@ -200,6 +223,18 @@ skipSdkResetMarker:
     strh r6, [r0, #2]
 
     adds r0, #(0x04000180 - 0x04000240) // REG_IPC_SYNC
+
+    // The ARM7 hotkey path is already running a tiny reset wait stub in ARM7
+    // private WRAM. Signal 3 exactly like Pico Loader's homebrew bootstub does,
+    // then start the freshly loaded ARM9. The ARM7 stub will jump to VRAM C.
+    mov r1, r8
+    cmp r1, #2
+    bne normal_arm7_sync
+    movs r1, #3
+    strb r1, [r0, #1]
+    b start_arm9
+
+normal_arm7_sync:
     movs r1, #1
     strb r1, [r0, #1]
 
@@ -211,6 +246,7 @@ skipSdkResetMarker:
     movs r1, #0
     strb r1, [r0, #1]
 
+start_arm9:
     movs r0, #0x68
     lsls r0, r0, #20 // 0x06800000
     bx r0
