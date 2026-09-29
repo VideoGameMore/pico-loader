@@ -9,36 +9,24 @@ patch_retailreturnhotkey_entry:
     // Preserve the state seen by the SDK IRQ dispatcher.
     stmdb sp!, {r0-r3, r12, lr}
 
-    // Only count the hotkey on VBlank IRQs so the hold time is frame based.
-    ldr r0, regIf
+    // ARM7 owns hotkey detection. It writes "PICO" into shared RAM when
+    // L+R+Down+Select has been held long enough. Check that mailbox on every
+    // ARM9 IRQ so we do not depend on the game's own soft-reset command.
+    ldr r0, retailReturnMarkerAddress
     ldr r1, [r0]
-    tst r1, #1
-    beq chain_original
+    ldr r2, markerValue
+    cmp r1, r2
+    bne chain_original
 
-    // REG_KEYINPUT is active-low. Require L + R + DOWN + SELECT.
-    ldr r0, regKeyInput
-    ldrh r1, [r0]
-    ldr r2, hotkeyMask
-    ands r1, r1, r2
-    bne clear_counter
-
-    adr r0, holdCounter
-    ldr r1, [r0]
-    add r1, r1, #1
+    // Consume the request before leaving the game.
+    mov r1, #0
     str r1, [r0]
-    cmp r1, #30
-    blo chain_original
 
-    // The reset patch does not return. Restore registers first, then jump
-    // directly into Pico Loader's existing OS_ResetSystem replacement.
+    // The return path does not come back. Restore the interrupted register
+    // state, then jump directly into Pico Loader's launcher-return routine.
     ldmia sp!, {r0-r3, r12, lr}
     ldr r12, patch_retailreturnhotkey_reset_address
     bx r12
-
-clear_counter:
-    adr r0, holdCounter
-    mov r1, #0
-    str r1, [r0]
 
 chain_original:
     ldmia sp!, {r0-r3, r12, lr}
@@ -54,14 +42,10 @@ patch_retailreturnhotkey_original_instruction1:
     ldr pc, patch_retailreturnhotkey_return_address
 
 .balign 4
-regIf:
-    .word 0x04000214
-regKeyInput:
-    .word 0x04000130
-hotkeyMask:
-    .word 0x00000384
-holdCounter:
-    .word 0
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
+markerValue:
+    .word 0x5049434F
 
 .global patch_retailreturnhotkey_return_address
 patch_retailreturnhotkey_return_address:
