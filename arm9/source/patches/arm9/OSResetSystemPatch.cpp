@@ -18,15 +18,10 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-// Nintendo SDK ARM9 IRQ dispatcher starts. These are the same families already
-// used here, but Build 49 no longer overwrites the dispatcher itself.
 static const u32 sOSIrqHandlerPattern[] = { 0xE92D4000u, 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u };
 static const u32 sOSIrqHandlerPatternAlt[] = { 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u, 0xE14F0000u };
 static const u32 sOSIrqHandlerPatternAlt5[] = { 0xE3A0C301u, 0xE5BC2208u, 0xE1EC00D8u, 0xE3520000u };
 
-// nds-bootstrap does not patch the dispatcher entry. It finds this tail sequence,
-// reads the literal IRQ-vector-table address immediately after it, and hooks the
-// first table entry (VBlank). Use the same strategy here.
 static const u32 sOSIrqHandlerEndPattern[] = {
     0xE59F1008u,
     0xE7910100u,
@@ -87,7 +82,11 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
     else
         LOG_DEBUG("OS_ResetSystem not found\n");
 
-    if (_osResetSystem && _loaderInfo && _loaderInfo->launcherPath[0] != 0)
+    // The IRQ-table bridge is independent of OS_ResetSystem. Mario Kart does
+    // not expose a recognized OS_ResetSystem target, so gating this discovery
+    // on _osResetSystem made Build 50 a no-op. nds-bootstrap discovers the SDK
+    // IRQ table independently, then uses its VBlank entry as a stable bridge.
+    if (_loaderInfo && _loaderInfo->launcherPath[0] != 0)
     {
         u32* irqStart = patchContext.FindPattern32(sOSIrqHandlerPattern, sizeof(sOSIrqHandlerPattern));
         if (!irqStart)
@@ -97,8 +96,6 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
         if (irqStart)
         {
-            // nds-bootstrap searches 50 words for the normal tail and up to
-            // 0x200 words for the alternate form. Use the wider bound once.
             u32* irqEnd = nullptr;
             for (u32 i = 0; i < 0x200; i++)
             {
@@ -115,8 +112,6 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
                 const u32 tableAddress = irqEnd[4];
                 if (tableAddress >= 0x02000000u && tableAddress < 0x03000000u && (tableAddress & 3u) == 0)
                 {
-                    // Reuse _irqHandler as the discovered IRQ vector-table pointer.
-                    // Entry zero is the VBlank callback.
                     _irqHandler = (u32*)tableAddress;
                     LOG_DEBUG("Found ARM9 IRQ vector table at %p\n", _irqHandler);
                 }
@@ -128,7 +123,7 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
         }
 
         if (!_irqHandler)
-            LOG_WARNING("ARM9 IRQ vector table not found; retail return hotkey disabled\n");
+            LOG_WARNING("ARM9 IRQ vector table not found; ARM7 return bridge unavailable\n");
     }
 
     return true;
@@ -136,8 +131,27 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    // Preserve the known boot-safe behavior: do nothing unless OS_ResetSystem
-    // was found. Builds that allocated this path unconditionally broke boot.
+    // Install only the tiny VBlank-table responder before the boot-safe guard.
+    // This does not allocate loader-info, SD-read, or reset infrastructure.
+    if (_irqHandler && _irqHandler[0] != 0)
+    {
+        const u32 originalVBlankHandler = _irqHandler[0];
+        const u32 ARM_NOP = 0xE1A00000u;
+
+        auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
+        (
+            patchContext.GetPatchHeap(),
+            ARM_NOP,
+            ARM_NOP,
+            (const void*)originalVBlankHandler,
+            nullptr
+        );
+
+        _irqHandler[0] = (u32)hotkeyPatchCode->GetEntryFunction();
+    }
+
+    // Keep the proven Build 41 boot guard. The large reset path is still only
+    // allocated for games where OS_ResetSystem was actually recognized.
     if (!_osResetSystem)
         return;
 
@@ -180,26 +194,6 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 
     *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
     *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
-
-    // Build 49: hook VBlank through the IRQ vector table instead of replacing
-    // the dispatcher entry. This is the method used by nds-bootstrap's retail
-    // card engine and avoids the dead dispatcher-entry hook from builds 37-48.
-    if (_irqHandler && _irqHandler[0] != 0)
-    {
-        const u32 originalVBlankHandler = _irqHandler[0];
-        const u32 ARM_NOP = 0xE1A00000u;
-
-        auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
-        (
-            patchContext.GetPatchHeap(),
-            ARM_NOP,
-            ARM_NOP,
-            (const void*)originalVBlankHandler,
-            patchCode->GetReturnToLauncherFunction()
-        );
-
-        _irqHandler[0] = (u32)hotkeyPatchCode->GetEntryFunction();
-    }
 
     _cheatsPointer = patchCodePart2->GetCheatsPointerAtTarget();
 }
