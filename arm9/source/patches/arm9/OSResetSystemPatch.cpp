@@ -125,7 +125,9 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
     }
 
-    if (_irqHandler)
+    // Diagnostic isolation: keep the no-OS_ResetSystem allocation path from
+    // build 39, but do not patch the ARM9 IRQ dispatcher in this build.
+    if (false && _irqHandler)
     {
         u32 returnAddress = (u32)(_irqHandler + 2);
         if (patchContext.GetAutoloadAdjuster())
