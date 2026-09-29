@@ -8,19 +8,21 @@
 patch_retailreturnhotkey_entry:
     stmdb sp!, {r0-r3, r12, lr}
 
-    // Build 49 diagnostic: this function is installed as the game's VBlank
-    // vector entry, following the same IRQ-table discovery strategy used by
-    // nds-bootstrap. If it executes, force both displays fully black.
-    ldr r0, masterBrightMain
-    ldr r1, masterBrightBlack
-    strh r1, [r0]
-    ldr r0, masterBrightSub
-    strh r1, [r0]
+    // ARM7 posts "PICO" into shared RAM after L+R+Down+Select is held.
+    // This VBlank-table responder only acknowledges it; ARM7 remains the
+    // owner of the hotkey and decides what happens next.
+    ldr r0, retailReturnMarkerAddress
+    ldr r1, [r0]
+    ldr r2, markerValue
+    cmp r1, r2
+    bne chain_original
 
+    ldr r1, ackValue
+    str r1, [r0]
+
+chain_original:
     ldmia sp!, {r0-r3, r12, lr}
 
-    // Kept for the existing PatchCode relocation interface. Build 49 passes
-    // ARM NOPs here because we are no longer replacing dispatcher opcodes.
 .global patch_retailreturnhotkey_original_instruction0
 patch_retailreturnhotkey_original_instruction0:
     .word 0
@@ -28,18 +30,17 @@ patch_retailreturnhotkey_original_instruction0:
 patch_retailreturnhotkey_original_instruction1:
     .word 0
 
-    // Tail-chain to the game's original VBlank callback. BX preserves ARM/Thumb
-    // state from bit 0 of the original vector-table entry.
-    ldr r12, patch_retailreturnhotkey_return_address
-    bx r12
+    // Tail-chain to the game's original VBlank callback. LR is still the
+    // dispatcher return address supplied by the Nintendo SDK IRQ code.
+    ldr pc, patch_retailreturnhotkey_return_address
 
 .balign 4
-masterBrightMain:
-    .word 0x0400006C
-masterBrightSub:
-    .word 0x0400106C
-masterBrightBlack:
-    .word 0x00008010
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
+markerValue:
+    .word 0x5049434F
+ackValue:
+    .word 0x41434B21
 
 .global patch_retailreturnhotkey_return_address
 patch_retailreturnhotkey_return_address:
