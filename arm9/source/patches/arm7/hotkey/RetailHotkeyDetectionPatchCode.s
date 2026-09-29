@@ -35,10 +35,10 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // ARM7 now owns the action completely. Mark this press fired, mute audio
-    // so the trigger is visible, disable ARM7 IRQs, then invoke the ARM7 BIOS
-    // SoftReset service directly. If the BIOS reset returns unexpectedly, the
-    // normal hook chain continues instead of spinning inside the IRQ.
+    // ARM7 owns the action. Mark this press fired and mute audio so the
+    // trigger is visible, then invoke the ARM7 BIOS SoftReset service.
+    // Keep IME untouched in this build so a later freeze cannot be caused
+    // simply by leaving ARM7 interrupts disabled if SoftReset returns.
     adr r2, firedFlag
     movs r3, #1
     str r3, [r2]
@@ -46,9 +46,6 @@ patch_retailhotkeydetect_entry:
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
-
-    ldr r2, regIme
-    str r3, [r2]
 
     swi 0x00
     b detection_done
@@ -70,8 +67,6 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-regIme:
-    .word 0x04000208
 hotkeyMask:
     .word 0x00000384
 holdCounter:
