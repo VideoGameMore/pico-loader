@@ -35,10 +35,8 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // ARM7 owns the action. Mark this press fired and mute audio so the
-    // trigger is visible, then invoke the ARM7 BIOS SoftReset service.
-    // Keep IME untouched in this build so a later freeze cannot be caused
-    // simply by leaving ARM7 interrupts disabled if SoftReset returns.
+    // ARM7 owns hotkey detection. Do not BIOS-reset either CPU here.
+    // Post a request into shared RAM and mute audio as the visible trigger.
     adr r2, firedFlag
     movs r3, #1
     str r3, [r2]
@@ -47,7 +45,9 @@ patch_retailhotkeydetect_entry:
     movs r3, #0
     strh r3, [r2]
 
-    swi 0x00
+    ldr r2, retailReturnMarkerAddress
+    ldr r3, markerValue
+    str r3, [r2]
     b detection_done
 
 clear_state:
@@ -67,8 +67,12 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
 hotkeyMask:
     .word 0x00000384
+markerValue:
+    .word 0x5049434F
 holdCounter:
     .word 0
 firedFlag:
