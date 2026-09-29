@@ -17,11 +17,31 @@ patch_retailhotkeydetect_entry:
     mov lr, r1
     push {r2-r5, lr}
 
+    // ARM7 owns the hotkey. First consume an acknowledgement from the
+    // ARM9 VBlank-table responder, if one arrived after our last request.
+    ldr r2, retailReturnMarkerAddress
+    ldr r3, [r2]
+    ldr r4, ackValue
+    cmp r3, r4
+    bne check_hotkey
+
+    movs r3, #0
+    str r3, [r2]
+    ldr r2, regSoundCnt
+    strh r3, [r2]
+    b detection_done
+
+check_hotkey:
     ldr r2, regKeyInput
     ldrh r3, [r2]
     ldr r4, hotkeyMask
     ands r3, r4
-    bne clear_counter
+    bne clear_state
+
+    adr r2, firedFlag
+    ldr r3, [r2]
+    cmp r3, #0
+    bne detection_done
 
     adr r2, holdCounter
     ldr r3, [r2]
@@ -30,21 +50,22 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // Only mute if ARM9's IRQ hook has written its independent heartbeat.
-    ldr r2, heartbeatAddress
-    ldr r3, [r2]
-    ldr r4, heartbeatValue
-    cmp r3, r4
-    bne detection_done
+    // Post the retail-return request for ARM9. This mirrors the ARM7-owned
+    // card-engine style: ARM7 detects and requests; ARM9 only acknowledges.
+    ldr r2, retailReturnMarkerAddress
+    ldr r3, markerValue
+    str r3, [r2]
 
-    ldr r2, regSoundCnt
-    movs r3, #0
-    strh r3, [r2]
+    adr r2, firedFlag
+    movs r3, #1
+    str r3, [r2]
     b detection_done
 
-clear_counter:
+clear_state:
     adr r2, holdCounter
     movs r3, #0
+    str r3, [r2]
+    adr r2, firedFlag
     str r3, [r2]
 
 detection_done:
@@ -57,13 +78,17 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
 hotkeyMask:
     .word 0x00000384
-heartbeatAddress:
-    .word 0x02FFFDF4
-heartbeatValue:
-    .word 0x48424D21
+markerValue:
+    .word 0x5049434F
+ackValue:
+    .word 0x41434B21
 holdCounter:
+    .word 0
+firedFlag:
     .word 0
 
 .pool
