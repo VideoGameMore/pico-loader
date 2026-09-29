@@ -8,11 +8,13 @@
 patch_retailreturnhotkey_entry:
     stmdb sp!, {r0-r3, r12, lr}
 
-    // Heartbeat on every ARM9 IRQ. ARM7 checks this independently of the
-    // retail-return request so we can prove the IRQ hook is actually running.
-    ldr r0, heartbeatAddress
-    ldr r1, heartbeatValue
-    str r1, [r0]
+    // Build 48 diagnostic: if this hook executes at all, force both displays
+    // fully black. This does not depend on ARM7 or shared RAM.
+    ldr r0, masterBrightMain
+    ldr r1, masterBrightBlack
+    strh r1, [r0]
+    ldr r0, masterBrightSub
+    strh r1, [r0]
 
     ldmia sp!, {r0-r3, r12, lr}
 
@@ -26,10 +28,12 @@ patch_retailreturnhotkey_original_instruction1:
     ldr pc, patch_retailreturnhotkey_return_address
 
 .balign 4
-heartbeatAddress:
-    .word 0x02FFFDF4
-heartbeatValue:
-    .word 0x48424D21
+masterBrightMain:
+    .word 0x0400006C
+masterBrightSub:
+    .word 0x0400106C
+masterBrightBlack:
+    .word 0x00008010
 
 .global patch_retailreturnhotkey_return_address
 patch_retailreturnhotkey_return_address:
