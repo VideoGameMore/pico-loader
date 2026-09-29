@@ -8,8 +8,9 @@
 patch_retailreturnhotkey_entry:
     stmdb sp!, {r0-r3, r12, lr}
 
-    // Build 48 diagnostic: if this hook executes at all, force both displays
-    // fully black. This does not depend on ARM7 or shared RAM.
+    // Build 49 diagnostic: this function is installed as the game's VBlank
+    // vector entry, following the same IRQ-table discovery strategy used by
+    // nds-bootstrap. If it executes, force both displays fully black.
     ldr r0, masterBrightMain
     ldr r1, masterBrightBlack
     strh r1, [r0]
@@ -18,6 +19,8 @@ patch_retailreturnhotkey_entry:
 
     ldmia sp!, {r0-r3, r12, lr}
 
+    // Kept for the existing PatchCode relocation interface. Build 49 passes
+    // ARM NOPs here because we are no longer replacing dispatcher opcodes.
 .global patch_retailreturnhotkey_original_instruction0
 patch_retailreturnhotkey_original_instruction0:
     .word 0
@@ -25,7 +28,10 @@ patch_retailreturnhotkey_original_instruction0:
 patch_retailreturnhotkey_original_instruction1:
     .word 0
 
-    ldr pc, patch_retailreturnhotkey_return_address
+    // Tail-chain to the game's original VBlank callback. BX preserves ARM/Thumb
+    // state from bit 0 of the original vector-table entry.
+    ldr r12, patch_retailreturnhotkey_return_address
+    bx r12
 
 .balign 4
 masterBrightMain:
