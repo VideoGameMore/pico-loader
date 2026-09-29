@@ -18,10 +18,6 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-static const u32 sOSIrqHandlerPattern[] = { 0xE92D4000u, 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u };
-static const u32 sOSIrqHandlerPatternAlt[] = { 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u, 0xE14F0000u };
-static const u32 sOSIrqHandlerPatternAlt5[] = { 0xE3A0C301u, 0xE5BC2208u, 0xE1EC00D8u, 0xE3520000u };
-
 bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 {
     _osResetSystem = nullptr;
@@ -63,26 +59,17 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
     else
         LOG_DEBUG("OS_ResetSystem not found\n");
 
-    if (_loaderInfo && _loaderInfo->launcherPath[0] != 0)
-    {
-        _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPattern, sizeof(sOSIrqHandlerPattern));
-        if (!_irqHandler)
-            _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt, sizeof(sOSIrqHandlerPatternAlt));
-        if (!_irqHandler)
-            _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt5, sizeof(sOSIrqHandlerPatternAlt5));
-
-        if (_irqHandler)
-            LOG_DEBUG("Found ARM9 IRQ dispatcher at %p\n", _irqHandler);
-        else
-            LOG_WARNING("ARM9 IRQ dispatcher not found; retail return hotkey disabled\n");
-    }
-
     return true;
 }
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    u32 offset = 0;
+    // Keep the retail boot path unchanged unless the game's SDK reset routine
+    // was positively identified. The ARM7 hotkey detector remains independent.
+    if (!_osResetSystem)
+        return;
+
+    u32 offset;
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         patch_osresetsystem_arm7Entry_address = 0x02FFFE34;
@@ -119,32 +106,10 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         patchCodePart2
     );
 
-    if (_osResetSystem)
-    {
-        *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
-        *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
-    }
+    *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
+    *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
 
-    // Diagnostic isolation: keep the no-OS_ResetSystem allocation path from
-    // build 39, but do not patch the ARM9 IRQ dispatcher in this build.
-    if (false && _irqHandler)
-    {
-        u32 returnAddress = (u32)(_irqHandler + 2);
-        if (patchContext.GetAutoloadAdjuster())
-            returnAddress = patchContext.GetAutoloadAdjuster()->AdjustInitialToFinal(returnAddress);
-
-        auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
-        (
-            patchContext.GetPatchHeap(),
-            _irqHandler[0],
-            _irqHandler[1],
-            (const void*)returnAddress,
-            patchCode->GetReturnToLauncherFunction()
-        );
-
-        _irqHandler[0] = 0xE51FF004;
-        _irqHandler[1] = (u32)hotkeyPatchCode->GetEntryFunction();
-    }
-
+    // Deliberately do not modify the ARM9 IRQ dispatcher. Builds 39/40 showed
+    // that touching the ARM9-side retail boot path here can prevent game boot.
     _cheatsPointer = patchCodePart2->GetCheatsPointerAtTarget();
 }
