@@ -17,21 +17,6 @@ patch_retailhotkeydetect_entry:
     mov lr, r1
     push {r2-r5, lr}
 
-    // ARM7 owns the hotkey. First consume an acknowledgement from the
-    // ARM9 VBlank-table responder, if one arrived after our last request.
-    ldr r2, retailReturnMarkerAddress
-    ldr r3, [r2]
-    ldr r4, ackValue
-    cmp r3, r4
-    bne check_hotkey
-
-    movs r3, #0
-    str r3, [r2]
-    ldr r2, regSoundCnt
-    strh r3, [r2]
-    b detection_done
-
-check_hotkey:
     ldr r2, regKeyInput
     ldrh r3, [r2]
     ldr r4, hotkeyMask
@@ -50,15 +35,22 @@ check_hotkey:
     cmp r3, #30
     blo detection_done
 
-    // Post the retail-return request for ARM9. This mirrors the ARM7-owned
-    // card-engine style: ARM7 detects and requests; ARM9 only acknowledges.
-    ldr r2, retailReturnMarkerAddress
-    ldr r3, markerValue
-    str r3, [r2]
-
+    // ARM7 now owns the action completely. Mark this press fired, mute audio
+    // so the trigger is visible, disable ARM7 IRQs, then invoke the ARM7 BIOS
+    // SoftReset service directly. If the BIOS reset returns unexpectedly, the
+    // normal hook chain continues instead of spinning inside the IRQ.
     adr r2, firedFlag
     movs r3, #1
     str r3, [r2]
+
+    ldr r2, regSoundCnt
+    movs r3, #0
+    strh r3, [r2]
+
+    ldr r2, regIme
+    str r3, [r2]
+
+    swi 0x00
     b detection_done
 
 clear_state:
@@ -78,14 +70,10 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-retailReturnMarkerAddress:
-    .word 0x02FFFDF0
+regIme:
+    .word 0x04000208
 hotkeyMask:
     .word 0x00000384
-markerValue:
-    .word 0x5049434F
-ackValue:
-    .word 0x41434B21
 holdCounter:
     .word 0
 firedFlag:
