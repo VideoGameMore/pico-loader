@@ -32,8 +32,16 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // Detection-only build: muting ARM7 master sound gives a harmless,
-    // immediately observable signal without invoking reset/reboot code.
+    // Local-marker diagnostic. Keep all state inside the already-proven ARM7
+    // patch block so no external/shared address is injected at boot.
+    adr r2, localMarker
+    ldr r3, markerValue
+    str r3, [r2]
+    ldr r4, [r2]
+    cmp r4, r3
+    bne detection_done
+
+    // Mute only after the local marker write/read succeeds.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -56,7 +64,11 @@ regSoundCnt:
     .word 0x04000500
 hotkeyMask:
     .word 0x00000384
+markerValue:
+    .word 0x4F434950
 holdCounter:
+    .word 0
+localMarker:
     .word 0
 
 .pool
