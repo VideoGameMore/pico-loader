@@ -32,16 +32,14 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // Local-marker diagnostic. Keep all state inside the already-proven ARM7
-    // patch block so no external/shared address is injected at boot.
-    adr r2, localMarker
+    // Signal ARM9 through a shared main-RAM mailbox. ARM7 detection is the
+    // proven part; ARM9 consumes this marker on its next IRQ and jumps straight
+    // into Pico Loader's return-to-launcher path.
+    ldr r2, retailReturnMarkerAddress
     ldr r3, markerValue
     str r3, [r2]
-    ldr r4, [r2]
-    cmp r4, r3
-    bne detection_done
 
-    // Mute only after the local marker write/read succeeds.
+    // Keep the mute as a visible confirmation that ARM7 accepted the hotkey.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -62,13 +60,13 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
 hotkeyMask:
     .word 0x00000384
 markerValue:
-    .word 0x4F434950
+    .word 0x5049434F
 holdCounter:
-    .word 0
-localMarker:
     .word 0
 
 .pool
