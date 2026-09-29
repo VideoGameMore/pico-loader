@@ -18,8 +18,6 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-// Nitro/TWL SDK ARM9 IRQ dispatcher signatures. The first signature is the
-// common SDK form; the alternates are used by a small number of retail titles.
 static const u32 sOSIrqHandlerPattern[] = { 0xE92D4000u, 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u };
 static const u32 sOSIrqHandlerPatternAlt[] = { 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u, 0xE14F0000u };
 static const u32 sOSIrqHandlerPatternAlt5[] = { 0xE3A0C301u, 0xE5BC2208u, 0xE1EC00D8u, 0xE3520000u };
@@ -32,9 +30,7 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
     {
         _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5Old, sizeof(sOSResetSystemPatternSdk5Old));
         if (!_osResetSystem)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5New, sizeof(sOSResetSystemPatternSdk5New));
-        }
         if (!_osResetSystem)
         {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5HybridOld, sizeof(sOSResetSystemPatternSdk5HybridOld));
@@ -49,61 +45,36 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
     else
     {
         if (patchContext.GetSdkVersion() >= 0x4017530)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk4, sizeof(sOSResetSystemPatternSdk4));
-        }
         if (!_osResetSystem && patchContext.GetSdkVersion() >= 0x3017530)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk3, sizeof(sOSResetSystemPatternSdk3));
-        }
         if (!_osResetSystem && patchContext.GetSdkVersion() >= 0x2017532)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk2New, sizeof(sOSResetSystemPatternSdk2New));
-        }
         if (!_osResetSystem && patchContext.GetSdkVersion() >= 0x2004F50)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk2, sizeof(sOSResetSystemPatternSdk2));
-        }
         if (!_osResetSystem && patchContext.GetSdkVersion() >= 0x2004EE9)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk2Old, sizeof(sOSResetSystemPatternSdk2Old));
-        }
         if (!_osResetSystem)
-        {
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternPokemonDownloader, sizeof(sOSResetSystemPatternPokemonDownloader));
-        }
     }
 
     if (_osResetSystem)
-    {
         LOG_DEBUG("Found end of OS_ResetSystem at %p\n", _osResetSystem);
-    }
     else
-    {
         LOG_DEBUG("OS_ResetSystem not found\n");
-    }
 
-    // A return hotkey is only useful when the frontend supplied a launcher path.
     if (_loaderInfo && _loaderInfo->launcherPath[0] != 0)
     {
         _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPattern, sizeof(sOSIrqHandlerPattern));
         if (!_irqHandler)
-        {
             _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt, sizeof(sOSIrqHandlerPatternAlt));
-        }
         if (!_irqHandler)
-        {
             _irqHandler = patchContext.FindPattern32(sOSIrqHandlerPatternAlt5, sizeof(sOSIrqHandlerPatternAlt5));
-        }
 
         if (_irqHandler)
-        {
             LOG_DEBUG("Found ARM9 IRQ dispatcher at %p\n", _irqHandler);
-        }
         else
-        {
             LOG_WARNING("ARM9 IRQ dispatcher not found; retail return hotkey disabled\n");
-        }
     }
 
     return true;
@@ -111,12 +82,7 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    if (!_osResetSystem)
-    {
-        return;
-    }
-
-    u32 offset;
+    u32 offset = 0;
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         patch_osresetsystem_arm7Entry_address = 0x02FFFE34;
@@ -124,9 +90,7 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         {
             offset = 0x80;
             if (!_runInDSiMode)
-            {
                 patch_osresetsystem_entry_jump_to_twl_arm7_sync = THUMB_NOP;
-            }
         }
         else
         {
@@ -155,16 +119,17 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         patchCodePart2
     );
 
-    *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
-    *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
+    if (_osResetSystem)
+    {
+        *(u32*)((u8*)_osResetSystem + offset) = 0xE51FF004;
+        *(u32*)((u8*)_osResetSystem + offset + 4) = (u32)patchCode->GetOSResetSystemFunction();
+    }
 
     if (_irqHandler)
     {
         u32 returnAddress = (u32)(_irqHandler + 2);
         if (patchContext.GetAutoloadAdjuster())
-        {
             returnAddress = patchContext.GetAutoloadAdjuster()->AdjustInitialToFinal(returnAddress);
-        }
 
         auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
         (
@@ -175,12 +140,9 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
             patchCode->GetReturnToLauncherFunction()
         );
 
-        // Replace the first two ARM instructions with an absolute jump. The
-        // hotkey patch replays both instructions before chaining back to +8.
         _irqHandler[0] = 0xE51FF004;
         _irqHandler[1] = (u32)hotkeyPatchCode->GetEntryFunction();
     }
 
     _cheatsPointer = patchCodePart2->GetCheatsPointerAtTarget();
 }
-
