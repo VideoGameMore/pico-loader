@@ -110,8 +110,15 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         }
         else
         {
-            // Detection test only. Reuse Pico Loader's existing ARM7 VBlank
-            // patching convention instead of touching ARM9 IRQ dispatch.
+            // Reserve the future return-to-launcher marker from the same managed
+            // main-memory arena Pico Loader already uses for runtime buffers.
+            // Do not hard-code an address and do not change the proven ARM7
+            // VBlank detector yet; this build validates boot safety first.
+            void* retailReturnMarker = (void*)correctAddress(mainMemoryArenaLo, romHeader);
+            *(vu32*)retailReturnMarker = 0;
+            mainMemoryArenaLo += sizeof(u32);
+            LOG_DEBUG("Retail return marker reserved at 0x%p\n", retailReturnMarker);
+
             patchCollection.AddPatch(new RetailHotkeyDetectionPatch());
         }
 
