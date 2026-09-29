@@ -9,24 +9,24 @@ patch_retailreturnhotkey_entry:
     // Preserve the state seen by the SDK IRQ dispatcher.
     stmdb sp!, {r0-r3, r12, lr}
 
-    // ARM7 owns hotkey detection. It writes "PICO" into shared RAM when
-    // L+R+Down+Select has been held long enough. Check that mailbox on every
-    // ARM9 IRQ so we do not depend on the game's own soft-reset command.
+    // ARM7 owns hotkey detection and writes "PICO" into shared RAM.
     ldr r0, retailReturnMarkerAddress
     ldr r1, [r0]
     ldr r2, markerValue
     cmp r1, r2
     bne chain_original
 
-    // Consume the request before leaving the game.
+    // Consume the request.
     mov r1, #0
     str r1, [r0]
 
-    // The return path does not come back. Restore the interrupted register
-    // state, then jump directly into Pico Loader's launcher-return routine.
-    ldmia sp!, {r0-r3, r12, lr}
-    ldr r12, patch_retailreturnhotkey_reset_address
-    bx r12
+    // Diagnostic only: prove ARM9 saw the mailbox without entering the
+    // launcher-return routine from IRQ context. Force both screens dark.
+    ldr r0, masterBrightMain
+    ldr r1, masterBrightBlack
+    strh r1, [r0]
+    ldr r0, masterBrightSub
+    strh r1, [r0]
 
 chain_original:
     ldmia sp!, {r0-r3, r12, lr}
@@ -46,6 +46,12 @@ retailReturnMarkerAddress:
     .word 0x02FFFDF0
 markerValue:
     .word 0x5049434F
+masterBrightMain:
+    .word 0x0400006C
+masterBrightSub:
+    .word 0x0400106C
+masterBrightBlack:
+    .word 0x00008010
 
 .global patch_retailreturnhotkey_return_address
 patch_retailreturnhotkey_return_address:
