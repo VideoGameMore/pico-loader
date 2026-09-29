@@ -16,17 +16,11 @@ patch_retailreturnhotkey_entry:
     cmp r1, r2
     bne chain_original
 
-    // Consume the request.
-    mov r1, #0
+    // Build 44 diagnostic: acknowledge the request back to ARM7. ARM7 will
+    // mute audio only after it sees this ACK, proving this ARM9 hook executed
+    // and both CPUs agree on the mailbox address.
+    ldr r1, ackValue
     str r1, [r0]
-
-    // Diagnostic only: prove ARM9 saw the mailbox without entering the
-    // launcher-return routine from IRQ context. Force both screens dark.
-    ldr r0, masterBrightMain
-    ldr r1, masterBrightBlack
-    strh r1, [r0]
-    ldr r0, masterBrightSub
-    strh r1, [r0]
 
 chain_original:
     ldmia sp!, {r0-r3, r12, lr}
@@ -46,12 +40,8 @@ retailReturnMarkerAddress:
     .word 0x02FFFDF0
 markerValue:
     .word 0x5049434F
-masterBrightMain:
-    .word 0x0400006C
-masterBrightSub:
-    .word 0x0400106C
-masterBrightBlack:
-    .word 0x00008010
+ackValue:
+    .word 0x41434B21
 
 .global patch_retailreturnhotkey_return_address
 patch_retailreturnhotkey_return_address:
