@@ -14,18 +14,18 @@ patch_cardireadcard_return_offset:
     push {r1,r2,r3,r4,r6,lr}
 
     // Stable ARM9 bridge diagnostic: this code already runs for patched retail
-    // ROM reads. If ARM7 posted the return request, black both screens. This
-    // proves cross-CPU handoff without relying on an IRQ hook or BIOS reset.
+    // ROM reads. Preserve r4 because the original patch carries cardi_common
+    // in r4 until patch_cardireadcard_mov_cardicommon_to_r6 below.
     ldr r3, retailReturnMarkerAddress
-    ldr r4, [r3]
+    ldr r0, [r3]
     ldr r3, markerValue
-    cmp r4, r3
+    cmp r0, r3
     bne no_return_request
     ldr r3, masterBrightMain
-    ldr r4, masterBrightBlack
-    strh r4, [r3]
+    ldr r0, masterBrightBlack
+    strh r0, [r3]
     ldr r3, masterBrightSub
-    strh r4, [r3]
+    strh r0, [r3]
 no_return_request:
 
     ldr r3, __patch_cardireadcard_fix_cp15_asm_address
