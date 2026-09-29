@@ -32,8 +32,16 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // Detection-only build: muting ARM7 master sound gives a harmless,
-    // immediately observable signal without invoking reset/reboot code.
+    // Write the PICO marker to the managed arena address, then read it back.
+    // Only mute after the round-trip succeeds so the mute is proof that the
+    // ARM7 can safely access this exact allocated marker.
+    ldr r2, patch_retailhotkeydetect_markerAddress
+    ldr r3, markerValue
+    str r3, [r2]
+    ldr r4, [r2]
+    cmp r4, r3
+    bne detection_done
+
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -56,7 +64,13 @@ regSoundCnt:
     .word 0x04000500
 hotkeyMask:
     .word 0x00000384
+markerValue:
+    .word 0x4F434950
 holdCounter:
+    .word 0
+
+.global patch_retailhotkeydetect_markerAddress
+patch_retailhotkeydetect_markerAddress:
     .word 0
 
 .pool

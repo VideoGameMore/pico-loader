@@ -110,16 +110,15 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         }
         else
         {
-            // Reserve the future return-to-launcher marker from the same managed
-            // main-memory arena Pico Loader already uses for runtime buffers.
-            // Do not hard-code an address and do not change the proven ARM7
-            // VBlank detector yet; this build validates boot safety first.
+            // Reserve the return-to-launcher marker from Pico Loader's managed
+            // main-memory arena and pass that exact address to the proven ARM7
+            // VBlank detector. No reset path is changed in this test.
             void* retailReturnMarker = (void*)correctAddress(mainMemoryArenaLo, romHeader);
             *(vu32*)retailReturnMarker = 0;
             mainMemoryArenaLo += sizeof(u32);
             LOG_DEBUG("Retail return marker reserved at 0x%p\n", retailReturnMarker);
 
-            patchCollection.AddPatch(new RetailHotkeyDetectionPatch());
+            patchCollection.AddPatch(new RetailHotkeyDetectionPatch(retailReturnMarker));
         }
 
         if (romHeader->unitCode == 0) // seems only present on NITRO, not on HYBRID or LIMITED

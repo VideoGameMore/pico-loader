@@ -53,7 +53,7 @@ void RetailHotkeyDetectionPatch::ApplyPatch(PatchContext& patchContext)
 
     auto patchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailHotkeyDetectionPatchCode>
     (
-        patchContext.GetPatchHeap()
+        patchContext.GetPatchHeap(), _returnMarker
     );
 
     int patchOffset;
