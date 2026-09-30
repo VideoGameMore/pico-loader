@@ -10,6 +10,21 @@
 .type dspico_readSdSectors, %function
 dspico_readSdSectors:
     push {r0,r1,r2,r4-r7,lr}
+
+    // Diagnostic rendezvous in Pico-owned code. The original r0-r2 values are
+    // already saved on the stack, so this check cannot disturb the SD read ABI.
+    ldr r0, retailReturnMarkerAddress
+    ldr r1, [r0]
+    ldr r0, retailReturnMarkerValue
+    cmp r1, r0
+    bne no_retail_return_request
+    ldr r0, masterBrightMain
+    ldr r1, masterBrightBlack
+    strh r1, [r0]
+    ldr r0, masterBrightSub
+    strh r1, [r0]
+no_retail_return_request:
+
     pop {r4,r5,r6}
 
 1:
@@ -45,6 +60,17 @@ read_request_settings:
 
 reg_base:
     .word 0x04000198
+
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
+retailReturnMarkerValue:
+    .word 0x5049434F
+masterBrightMain:
+    .word 0x0400006C
+masterBrightSub:
+    .word 0x0400106C
+masterBrightBlack:
+    .word 0x00008010
 
 .global dspico_readsdsectors_readDirectAddress
 dspico_readsdsectors_readDirectAddress:
