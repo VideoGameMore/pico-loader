@@ -17,6 +17,19 @@ patch_retailhotkeydetect_entry:
     mov lr, r1
     push {r2-r5, lr}
 
+    // If ARM9 acknowledged the request, restore master audio so the handshake
+    // is visible without forcing a reset or touching game code.
+    ldr r2, retailReturnMarkerAddress
+    ldr r3, [r2]
+    ldr r4, ackValue
+    cmp r3, r4
+    bne check_hotkey
+    ldr r2, regSoundCnt
+    ldr r3, soundCntEnabled
+    strh r3, [r2]
+    b detection_done
+
+check_hotkey:
     ldr r2, regKeyInput
     ldrh r3, [r2]
     ldr r4, hotkeyMask
@@ -35,8 +48,7 @@ patch_retailhotkeydetect_entry:
     cmp r3, #30
     blo detection_done
 
-    // ARM7 owns hotkey detection. Do not BIOS-reset either CPU here.
-    // Post a request into shared RAM and mute audio as the visible trigger.
+    // ARM7 owns hotkey detection. Post the cross-CPU request and mute audio.
     adr r2, firedFlag
     movs r3, #1
     str r3, [r2]
@@ -73,6 +85,10 @@ hotkeyMask:
     .word 0x00000384
 markerValue:
     .word 0x5049434F
+ackValue:
+    .word 0x41434B21
+soundCntEnabled:
+    .word 0x0000807F
 holdCounter:
     .word 0
 firedFlag:
