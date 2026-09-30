@@ -12,22 +12,6 @@ patch_cardireadcard_return_offset:
     movs r0, #0x38
     add lr, r0
     push {r1,r2,r3,r4,r6,lr}
-
-    // Stable ARM9 bridge diagnostic: this code already runs for patched retail
-    // ROM reads. Preserve r4 because the original patch carries cardi_common
-    // in r4 until patch_cardireadcard_mov_cardicommon_to_r6 below.
-    ldr r3, retailReturnMarkerAddress
-    ldr r0, [r3]
-    ldr r3, markerValue
-    cmp r0, r3
-    bne no_return_request
-    ldr r3, masterBrightMain
-    ldr r0, masterBrightBlack
-    strh r0, [r3]
-    ldr r3, masterBrightSub
-    strh r0, [r3]
-no_return_request:
-
     ldr r3, __patch_cardireadcard_fix_cp15_asm_address
     blx r3
 .global patch_cardireadcard_mov_src_to_r0
@@ -83,16 +67,6 @@ ignore_read:
     pop {r1,r2,r3,r4,r6,pc}
 
 .balign 4
-retailReturnMarkerAddress:
-    .word 0x02FFFDF0
-markerValue:
-    .word 0x5049434F
-masterBrightMain:
-    .word 0x0400006C
-masterBrightSub:
-    .word 0x0400106C
-masterBrightBlack:
-    .word 0x00008010
 
 .global __patch_cardireadcard_fix_cp15_asm_address
 __patch_cardireadcard_fix_cp15_asm_address:
