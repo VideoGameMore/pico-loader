@@ -6,6 +6,21 @@
 .global patch_osresetsystem_entry
 .type patch_osresetsystem_entry, %function
 patch_osresetsystem_entry:
+    // The ARM7 hotkey detector posts "PICO" in shared RAM. If the game's
+    // native reset routine reaches us with that request pending, consume it
+    // and use the coordinated return-to-launcher mode. Otherwise preserve the
+    // game's normal SDK reset semantics.
+    ldr r1, retailReturnMarkerAddress
+    ldr r2, [r1]
+    ldr r3, retailReturnMarkerValue
+    cmp r2, r3
+    bne normalResetEntry
+    movs r2, #0
+    str r2, [r1]
+    movs r0, #1
+    b patch_osresetsystem_entry_common
+
+normalResetEntry:
     movs r0, #0
     b patch_osresetsystem_entry_common
 
@@ -85,6 +100,11 @@ loadData:
     mov pc, r11
 
 .balign 4
+
+retailReturnMarkerAddress:
+    .word 0x02FFFDF0
+retailReturnMarkerValue:
+    .word 0x5049434F
 
 regIpcSync:
     .word 0x04000180
