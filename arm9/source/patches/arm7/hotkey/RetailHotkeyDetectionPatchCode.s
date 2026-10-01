@@ -40,20 +40,22 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Visible proof that the hotkey fired.
+    // Briefly mute so we can tell the hotkey fired.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
 
-    // Request the DSi/TWL reboot directly while the retail ARM7 runtime and
-    // SPI bus are still intact. Register 0x10 bit 0 is the DSi reset bit and
-    // is available from NTR compatibility mode as well. No ARM9 game hook.
+    // Test the TWL PMIC reboot request without parking ARM7 afterward.
+    // If the reboot command is actually accepted, execution never returns.
     bl patch_retailhotkeydetect_request_twl_reboot
 
-    // A successful reboot never returns. If unsupported, park instead of
-    // falling back into the game's VBlank handler with altered PMIC state.
-1:
-    b 1b
+    // If we get here, the reboot request was ignored. Restore sound and
+    // return cleanly to the game's VBlank handler so a black screen cannot
+    // be caused simply by parking ARM7.
+    ldr r2, regSoundCnt
+    ldr r3, soundCntEnabled
+    strh r3, [r2]
+    b detection_done
 
 clear_state:
     adr r2, holdCounter
@@ -72,6 +74,8 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
+soundCntEnabled:
+    .word 0x0000807F
 hotkeyMask:
     .word 0x00000384
 
@@ -93,7 +97,6 @@ wait_idle_0:
     tst r1, r3
     bne wait_idle_0
 
-    // Select PMIC, 1 MHz, keep CS asserted for the following data byte.
     ldr r1, spiCntHold
     strh r1, [r0]
     movs r1, #0x10
@@ -105,7 +108,6 @@ wait_idle_1:
     tst r1, r3
     bne wait_idle_1
 
-    // Final byte: bit 0 requests reboot.
     ldr r1, spiCntLast
     strh r1, [r0]
     movs r1, #1
