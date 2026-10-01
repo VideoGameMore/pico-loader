@@ -90,8 +90,8 @@ firedFlag:
 .type patch_retailhotkeydetect_i2c_pm_write, %function
 patch_retailhotkeydetect_i2c_pm_write:
     push {r2-r7, lr}
-    mov r6, r0
-    mov r7, r1
+    movs r6, r0
+    movs r7, r1
     movs r5, #8
 
 i2c_retry:
