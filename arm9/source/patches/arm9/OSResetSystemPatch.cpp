@@ -3,6 +3,7 @@
 #include "thumbInstructions.h"
 #include "patches/platform/LoaderPlatform.h"
 #include "OSResetSystemPatchCode.h"
+#include "RetailReturnHotkeyPatchCode.h"
 #include "OSResetSystemPatch.h"
 
 static const u32 sOSResetSystemPatternSdk2Old[] = { 0xE59F101Cu, 0xE3A00010u, 0xE5815000u, 0xEB000005u };
@@ -17,24 +18,33 @@ static const u32 sOSResetSystemPatternSdk5New[] = { 0xE1A05000u, 0xE1D100B0u, 0x
 static const u32 sOSResetSystemPatternSdk5HybridOld[] = { 0xE1A04000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 static const u32 sOSResetSystemPatternSdk5HybridNew[] = { 0xE1A05000u, 0xE1D100B0u, 0xE3500002u, 0x0A000006 };
 
-// Broader reset-function starts used by nds-bootstrap. These let us find games
-// such as Mario Kart DS where the existing interior OS_ResetSystem signatures
-// are absent even though the retail reset routine is present and working.
-static const u32 sResetStartSdk2[]     = { 0xE92D4030u, 0xE24DD004u, 0xE59F1090u, 0xE1A05000u };
-static const u32 sResetStartSdk2Alt1[] = { 0xE92D000Fu, 0xE92D4010u, 0xEB000026u, 0xE3500000u };
-static const u32 sResetStartSdk2Alt2[] = { 0xE92D4010u, 0xE59F1078u, 0xE1A04000u, 0xE1D100B0u };
-static const u32 sResetStartSdk3[]     = { 0xE92D4010u, 0xE59F106Cu, 0xE1A04000u, 0xE1D100B0u };
-static const u32 sResetStartSdk3Alt[]  = { 0xE92D4010u, 0xE59F1068u, 0xE1A04000u, 0xE1D100B0u };
-static const u32 sResetStartSdk4[]     = { 0xE92D4070u, 0xE59F10A0u, 0xE1A04000u, 0xE1D100B0u };
-static const u32 sResetStartSdk4Alt[]  = { 0xE92D4010u, 0xE59F1084u, 0xE1A04000u, 0xE1D100B0u };
-static const u32 sResetStartSdk5[]     = { 0xE92D4038u, 0xE59F1054u, 0xE1A05000u, 0xE1D100B0u };
-static const u32 sResetStartSdk5Alt1[] = { 0xE92D4010u, 0xE59F104Cu, 0xE1A04000u, 0xE1D100B0u };
+static const u32 sOSIrqHandlerPattern[] = { 0xE92D4000u, 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u };
+static const u32 sOSIrqHandlerPatternAlt[] = { 0xE3A0C301u, 0xE28CCE21u, 0xE51C1008u, 0xE14F0000u };
+static const u32 sOSIrqHandlerPatternAlt5[] = { 0xE3A0C301u, 0xE5BC2208u, 0xE1EC00D8u, 0xE3520000u };
+
+static const u32 sOSIrqHandlerEndPattern[] = {
+    0xE59F1008u,
+    0xE7910100u,
+    0xE59FE004u,
+    0xE12FFF10u
+};
+static const u32 sOSIrqHandlerEndPatternAlt[] = {
+    0xE59F100Cu,
+    0xE5813000u,
+    0xE5813004u,
+    0xEAFFFFB8u
+};
+
+static bool Matches4(const u32* p, const u32* pattern)
+{
+    return p[0] == pattern[0] && p[1] == pattern[1] &&
+           p[2] == pattern[2] && p[3] == pattern[3];
+}
 
 bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 {
     _osResetSystem = nullptr;
-    _patchAtStart = false;
-
+    _irqHandler = nullptr;
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternSdk5Old, sizeof(sOSResetSystemPatternSdk5Old));
@@ -67,52 +77,86 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
             _osResetSystem = patchContext.FindPattern32(sOSResetSystemPatternPokemonDownloader, sizeof(sOSResetSystemPatternPokemonDownloader));
     }
 
-    if (!_osResetSystem)
-    {
-        const u32* signatures[] = {
-            sResetStartSdk2, sResetStartSdk2Alt1, sResetStartSdk2Alt2,
-            sResetStartSdk3, sResetStartSdk3Alt,
-            sResetStartSdk4, sResetStartSdk4Alt,
-            sResetStartSdk5, sResetStartSdk5Alt1
-        };
-        const size_t sizes[] = {
-            sizeof(sResetStartSdk2), sizeof(sResetStartSdk2Alt1), sizeof(sResetStartSdk2Alt2),
-            sizeof(sResetStartSdk3), sizeof(sResetStartSdk3Alt),
-            sizeof(sResetStartSdk4), sizeof(sResetStartSdk4Alt),
-            sizeof(sResetStartSdk5), sizeof(sResetStartSdk5Alt1)
-        };
-
-        for (u32 i = 0; i < sizeof(signatures) / sizeof(signatures[0]); i++)
-        {
-            _osResetSystem = patchContext.FindPattern32(signatures[i], sizes[i]);
-            if (_osResetSystem)
-            {
-                _patchAtStart = true;
-                break;
-            }
-        }
-    }
-
     if (_osResetSystem)
-        LOG_DEBUG("Found OS_ResetSystem at %p%s\n", _osResetSystem, _patchAtStart ? " (function start)" : "");
+        LOG_DEBUG("Found end of OS_ResetSystem at %p\n", _osResetSystem);
     else
         LOG_DEBUG("OS_ResetSystem not found\n");
+
+    // The IRQ-table bridge is independent of OS_ResetSystem. Mario Kart does
+    // not expose a recognized OS_ResetSystem target, so gating this discovery
+    // on _osResetSystem made Build 50 a no-op. nds-bootstrap discovers the SDK
+    // IRQ table independently, then uses its VBlank entry as a stable bridge.
+    if (_loaderInfo && _loaderInfo->launcherPath[0] != 0)
+    {
+        u32* irqStart = patchContext.FindPattern32(sOSIrqHandlerPattern, sizeof(sOSIrqHandlerPattern));
+        if (!irqStart)
+            irqStart = patchContext.FindPattern32(sOSIrqHandlerPatternAlt, sizeof(sOSIrqHandlerPatternAlt));
+        if (!irqStart)
+            irqStart = patchContext.FindPattern32(sOSIrqHandlerPatternAlt5, sizeof(sOSIrqHandlerPatternAlt5));
+
+        if (irqStart)
+        {
+            u32* irqEnd = nullptr;
+            for (u32 i = 0; i < 0x200; i++)
+            {
+                u32* p = irqStart + i;
+                if (Matches4(p, sOSIrqHandlerEndPattern) || Matches4(p, sOSIrqHandlerEndPatternAlt))
+                {
+                    irqEnd = p;
+                    break;
+                }
+            }
+
+            if (irqEnd)
+            {
+                const u32 tableAddress = irqEnd[4];
+                if (tableAddress >= 0x02000000u && tableAddress < 0x03000000u && (tableAddress & 3u) == 0)
+                {
+                    _irqHandler = (u32*)tableAddress;
+                    LOG_DEBUG("Found ARM9 IRQ vector table at %p\n", _irqHandler);
+                }
+                else
+                {
+                    LOG_WARNING("ARM9 IRQ vector table literal invalid: %08lx\n", tableAddress);
+                }
+            }
+        }
+
+        if (!_irqHandler)
+            LOG_WARNING("ARM9 IRQ vector table not found; ARM7 return bridge unavailable\n");
+    }
 
     return true;
 }
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
+    // Install only the tiny VBlank-table responder before the boot-safe guard.
+    // This does not allocate loader-info, SD-read, or reset infrastructure.
+    if (_irqHandler && _irqHandler[0] != 0)
+    {
+        const u32 originalVBlankHandler = _irqHandler[0];
+        const u32 ARM_NOP = 0xE1A00000u;
+
+        auto hotkeyPatchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<RetailReturnHotkeyPatchCode>
+        (
+            patchContext.GetPatchHeap(),
+            ARM_NOP,
+            ARM_NOP,
+            (const void*)originalVBlankHandler,
+            nullptr
+        );
+
+        _irqHandler[0] = (u32)hotkeyPatchCode->GetEntryFunction();
+    }
+
+    // Keep the proven Build 41 boot guard. The large reset path is still only
+    // allocated for games where OS_ResetSystem was actually recognized.
     if (!_osResetSystem)
         return;
 
     u32 offset;
-    if (_patchAtStart)
-    {
-        offset = 0;
-        patch_osresetsystem_entry_jump_to_twl_arm7_sync = THUMB_NOP;
-    }
-    else if (patchContext.GetSdkVersion().IsTwlSdk())
+    if (patchContext.GetSdkVersion().IsTwlSdk())
     {
         patch_osresetsystem_arm7Entry_address = 0x02FFFE34;
         if (_hybrid)
