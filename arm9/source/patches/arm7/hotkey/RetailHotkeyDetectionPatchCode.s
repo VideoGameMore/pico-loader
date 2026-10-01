@@ -40,20 +40,20 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Visible proof that the hotkey fired before entering the reset path.
+    // Visible proof that the hotkey fired.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
 
-    // Enter a controlled ARM7 BIOS reset, returning into the resident
-    // post-reset trampoline below. No ARM9 game hook is involved.
-    ldr r2, arm7ResetVectorAddress
-    adr r3, patch_retailhotkeydetect_postreset_arm
-    str r3, [r2]
-    swi 0x00
+    // Request the DSi/TWL reboot directly while the retail ARM7 runtime and
+    // SPI bus are still intact. Register 0x10 bit 0 is the DSi reset bit and
+    // is available from NTR compatibility mode as well. No ARM9 game hook.
+    bl patch_retailhotkeydetect_request_twl_reboot
 
-    // SoftReset should never return.
-    b detection_done
+    // A successful reboot never returns. If unsupported, park instead of
+    // falling back into the game's VBlank handler with altered PMIC state.
+1:
+    b 1b
 
 clear_state:
     adr r2, holdCounter
@@ -72,8 +72,6 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-arm7ResetVectorAddress:
-    .word 0x02FFFE34
 hotkeyMask:
     .word 0x00000384
 
@@ -83,54 +81,51 @@ firedFlag:
     .word 0
 
 .balign 4
-.arm
-.global patch_retailhotkeydetect_postreset_arm
-.type patch_retailhotkeydetect_postreset_arm, %function
-patch_retailhotkeydetect_postreset_arm:
-    // We have control after the ARM7 BIOS reset. Request a TWL hardware reboot
-    // directly from the power-management chip over ARM7 SPI.
-    ldr r0, postresetSpiCnt
-    ldr r2, postresetSpiData
+.thumb
+.type patch_retailhotkeydetect_request_twl_reboot, %function
+patch_retailhotkeydetect_request_twl_reboot:
+    ldr r0, spiCnt
+    ldr r2, spiData
 
-postreset_wait_idle_0:
+wait_idle_0:
     ldrh r1, [r0]
-    tst r1, #0x80
-    bne postreset_wait_idle_0
+    movs r3, #0x80
+    tst r1, r3
+    bne wait_idle_0
 
-    // PMIC register byte, keep chip select asserted for the data byte.
-    ldr r1, postresetSpiCntHold
+    // Select PMIC, 1 MHz, keep CS asserted for the following data byte.
+    ldr r1, spiCntHold
     strh r1, [r0]
-    mov r1, #0x10
+    movs r1, #0x10
     strh r1, [r2]
 
-postreset_wait_idle_1:
+wait_idle_1:
     ldrh r1, [r0]
-    tst r1, #0x80
-    bne postreset_wait_idle_1
+    movs r3, #0x80
+    tst r1, r3
+    bne wait_idle_1
 
-    // PMIC_REG_TWL = 0x10, PMIC_TWL_REBOOT = 1.
-    ldr r1, postresetSpiCntLast
+    // Final byte: bit 0 requests reboot.
+    ldr r1, spiCntLast
     strh r1, [r0]
-    mov r1, #1
+    movs r1, #1
     strh r1, [r2]
 
-postreset_wait_idle_2:
+wait_idle_2:
     ldrh r1, [r0]
-    tst r1, #0x80
-    bne postreset_wait_idle_2
-
-    // A successful reboot never returns. Park here if the command is ignored.
-1:
-    b 1b
+    movs r3, #0x80
+    tst r1, r3
+    bne wait_idle_2
+    bx lr
 
 .balign 4
-postresetSpiCnt:
+spiCnt:
     .word 0x040001C0
-postresetSpiData:
+spiData:
     .word 0x040001C2
-postresetSpiCntHold:
+spiCntHold:
     .word 0x00008802
-postresetSpiCntLast:
+spiCntLast:
     .word 0x00008002
 
 .pool
