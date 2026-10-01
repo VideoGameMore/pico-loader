@@ -45,9 +45,8 @@ check_hotkey:
     movs r3, #0
     strh r3, [r2]
 
-    // ARM7-only controlled reset. Point the BIOS ARM7 reset vector at a
-    // resident ARM-state trampoline in this patch, then invoke SoftReset.
-    // No ARM9 game hook or ARM9 callback is involved.
+    // Enter a controlled ARM7 BIOS reset, returning into the resident
+    // post-reset trampoline below. No ARM9 game hook is involved.
     ldr r2, arm7ResetVectorAddress
     adr r3, patch_retailhotkeydetect_postreset_arm
     str r3, [r2]
@@ -88,19 +87,51 @@ firedFlag:
 .global patch_retailhotkeydetect_postreset_arm
 .type patch_retailhotkeydetect_postreset_arm, %function
 patch_retailhotkeydetect_postreset_arm:
-    // Re-enable the master sound register as the unmistakable indication that
-    // ARM7 actually reached our code after BIOS SoftReset, then park ARM7.
-    ldr r0, postresetSoundCnt
-    ldr r1, postresetSoundEnabled
+    // We have control after the ARM7 BIOS reset. Request a TWL hardware reboot
+    // directly from the power-management chip over ARM7 SPI.
+    ldr r0, postresetSpiCnt
+    ldr r2, postresetSpiData
+
+postreset_wait_idle_0:
+    ldrh r1, [r0]
+    tst r1, #0x80
+    bne postreset_wait_idle_0
+
+    // PMIC register byte, keep chip select asserted for the data byte.
+    ldr r1, postresetSpiCntHold
     strh r1, [r0]
+    mov r1, #0x10
+    strh r1, [r2]
+
+postreset_wait_idle_1:
+    ldrh r1, [r0]
+    tst r1, #0x80
+    bne postreset_wait_idle_1
+
+    // PMIC_REG_TWL = 0x10, PMIC_TWL_REBOOT = 1.
+    ldr r1, postresetSpiCntLast
+    strh r1, [r0]
+    mov r1, #1
+    strh r1, [r2]
+
+postreset_wait_idle_2:
+    ldrh r1, [r0]
+    tst r1, #0x80
+    bne postreset_wait_idle_2
+
+    // A successful reboot never returns. Park here if the command is ignored.
 1:
     b 1b
 
 .balign 4
-postresetSoundCnt:
-    .word 0x04000500
-postresetSoundEnabled:
-    .word 0x0000807F
+postresetSpiCnt:
+    .word 0x040001C0
+postresetSpiData:
+    .word 0x040001C2
+postresetSpiCntHold:
+    .word 0x00008802
+postresetSpiCntLast:
+    .word 0x00008002
 
 .pool
 .end
