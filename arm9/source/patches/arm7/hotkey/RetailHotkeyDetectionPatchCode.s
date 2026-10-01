@@ -40,21 +40,15 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Briefly mute so we can tell the hotkey fired.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
 
-    // Test the TWL PMIC reboot request without parking ARM7 afterward.
-    // If the reboot command is actually accepted, execution never returns.
-    bl patch_retailhotkeydetect_request_twl_reboot
+    ldr r2, arm7ResetVectorAddress
+    adr r3, patch_retailhotkeydetect_postreset_arm
+    str r3, [r2]
+    swi 0x00
 
-    // If we get here, the reboot request was ignored. Restore sound and
-    // return cleanly to the game's VBlank handler so a black screen cannot
-    // be caused simply by parking ARM7.
-    ldr r2, regSoundCnt
-    ldr r3, soundCntEnabled
-    strh r3, [r2]
     b detection_done
 
 clear_state:
@@ -74,8 +68,8 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-soundCntEnabled:
-    .word 0x0000807F
+arm7ResetVectorAddress:
+    .word 0x02FFFE34
 hotkeyMask:
     .word 0x00000384
 
@@ -85,50 +79,69 @@ firedFlag:
     .word 0
 
 .balign 4
-.thumb
-.type patch_retailhotkeydetect_request_twl_reboot, %function
-patch_retailhotkeydetect_request_twl_reboot:
-    ldr r0, spiCnt
-    ldr r2, spiData
+.arm
+.global patch_retailhotkeydetect_postreset_arm
+.type patch_retailhotkeydetect_postreset_arm, %function
+patch_retailhotkeydetect_postreset_arm:
+    ldr r0, arm9StubAddress
+    ldr r1, arm9Stub0
+    str r1, [r0, #0]
+    ldr r1, arm9Stub1
+    str r1, [r0, #4]
+    ldr r1, arm9Stub2
+    str r1, [r0, #8]
+    ldr r1, arm9Stub3
+    str r1, [r0, #12]
+    ldr r1, arm9Stub4
+    str r1, [r0, #16]
+    ldr r1, arm9Stub5
+    str r1, [r0, #20]
+    ldr r1, arm9Stub6
+    str r1, [r0, #24]
+    ldr r1, arm9Stub7
+    str r1, [r0, #28]
+    ldr r1, arm9Stub8
+    str r1, [r0, #32]
 
-wait_idle_0:
-    ldrh r1, [r0]
-    movs r3, #0x80
-    tst r1, r3
-    bne wait_idle_0
+    ldr r0, arm9ResetVectorAddress
+    ldr r1, arm9StubAddress
+    str r1, [r0]
 
-    ldr r1, spiCntHold
-    strh r1, [r0]
-    movs r1, #0x10
-    strh r1, [r2]
+    ldr r0, ipcFifoTx
+    ldr r1, arm9ResetCommand
+    str r1, [r0]
 
-wait_idle_1:
-    ldrh r1, [r0]
-    movs r3, #0x80
-    tst r1, r3
-    bne wait_idle_1
-
-    ldr r1, spiCntLast
-    strh r1, [r0]
-    movs r1, #1
-    strh r1, [r2]
-
-wait_idle_2:
-    ldrh r1, [r0]
-    movs r3, #0x80
-    tst r1, r3
-    bne wait_idle_2
-    bx lr
+1:
+    b 1b
 
 .balign 4
-spiCnt:
-    .word 0x040001C0
-spiData:
-    .word 0x040001C2
-spiCntHold:
-    .word 0x00008802
-spiCntLast:
-    .word 0x00008002
+arm9ResetVectorAddress:
+    .word 0x02FFFE24
+ipcFifoTx:
+    .word 0x04000188
+arm9ResetCommand:
+    .word 0x0C04000C
+arm9StubAddress:
+    .word 0x02300000
+
+arm9Stub0:
+    .word 0xE59F0014
+arm9Stub1:
+    .word 0xE59F1014
+arm9Stub2:
+    .word 0xE1C010B0
+arm9Stub3:
+    .word 0xE59F0010
+arm9Stub4:
+    .word 0xE1C010B0
+arm9Stub5:
+    .word 0xEAFFFFFE
+arm9Stub6:
+    .word 0x0400006C
+arm9Stub7:
+    .word 0x0000401F
+arm9Stub8:
+    .word 0x0400106C
 
 .pool
 .end
