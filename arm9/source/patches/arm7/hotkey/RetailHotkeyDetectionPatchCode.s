@@ -36,27 +36,24 @@ check_hotkey:
     cmp r3, #30
     blo detection_done
 
-    // Proven ARM7 hotkey path.
     adr r2, firedFlag
     movs r3, #1
     str r3, [r2]
 
+    // Visible proof that the hotkey fired before entering the reset path.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
 
-    // Use the retail SDK's native reset FIFO handoff. This does not hook any
-    // ARM9 game routine: ARM7 supplies a managed reset-vector destination and
-    // asks the SDK reset machinery to transfer ARM9 there.
-    ldr r2, arm9ResetVectorAddress
-    ldr r3, patch_retailhotkeydetect_arm9_transition_address
-    cmp r3, #0
-    beq detection_done
+    // ARM7-only controlled reset. Point the BIOS ARM7 reset vector at a
+    // resident ARM-state trampoline in this patch, then invoke SoftReset.
+    // No ARM9 game hook or ARM9 callback is involved.
+    ldr r2, arm7ResetVectorAddress
+    adr r3, patch_retailhotkeydetect_postreset_arm
     str r3, [r2]
+    swi 0x00
 
-    ldr r2, ipcFifoTxAddress
-    ldr r3, sdkResetCommand
-    str r3, [r2]
+    // SoftReset should never return.
     b detection_done
 
 clear_state:
@@ -76,23 +73,34 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-arm9ResetVectorAddress:
-    .word 0x02FFFE24
-ipcFifoTxAddress:
-    .word 0x04000188
-sdkResetCommand:
-    .word 0x0C04000C
+arm7ResetVectorAddress:
+    .word 0x02FFFE34
 hotkeyMask:
     .word 0x00000384
-
-.global patch_retailhotkeydetect_arm9_transition_address
-patch_retailhotkeydetect_arm9_transition_address:
-    .word 0
 
 holdCounter:
     .word 0
 firedFlag:
     .word 0
+
+.balign 4
+.arm
+.global patch_retailhotkeydetect_postreset_arm
+.type patch_retailhotkeydetect_postreset_arm, %function
+patch_retailhotkeydetect_postreset_arm:
+    // Re-enable the master sound register as the unmistakable indication that
+    // ARM7 actually reached our code after BIOS SoftReset, then park ARM7.
+    ldr r0, postresetSoundCnt
+    ldr r1, postresetSoundEnabled
+    strh r1, [r0]
+1:
+    b 1b
+
+.balign 4
+postresetSoundCnt:
+    .word 0x04000500
+postresetSoundEnabled:
+    .word 0x0000807F
 
 .pool
 .end
