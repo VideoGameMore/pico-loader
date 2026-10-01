@@ -20,25 +20,6 @@
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatch.h"
 #include "Arm7Patcher.h"
 
-extern "C" u32 patch_retailhotkeydetect_arm9_transition_address;
-
-// Position-independent ARM9 reset destination used only after the ARM7 hotkey
-// requests the retail SDK reset handoff. It blacks both displays, then parks.
-// A successful black-screen transition proves the native two-CPU reset bridge
-// works without patching an ARM9 game IRQ/CARDi/SD execution path.
-static const u32 sRetailReturnArm9Transition[] =
-{
-    0xE59F0010u, // ldr r0, [pc, #16] -> REG_MASTER_BRIGHT main
-    0xE59F1010u, // ldr r1, [pc, #16] -> forced-black value
-    0xE1C010B0u, // strh r1, [r0]
-    0xE59F000Cu, // ldr r0, [pc, #12] -> REG_MASTER_BRIGHT sub
-    0xE1C010B0u, // strh r1, [r0]
-    0xEAFFFFFEu, // b .
-    0x0400006Cu,
-    0x00008010u,
-    0x0400106Cu,
-};
-
 static u32 correctAddress(u32 address, const nds_header_ntr_t* romHeader)
 {
     if (gIsDsiMode && romHeader->unitCode == 0)
@@ -129,15 +110,6 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         }
         else
         {
-            // Reserve a tiny ARM9 reset destination from the SDK-managed main
-            // memory arena. The game arena is moved past it, so retail code will
-            // not overwrite the handoff stub while running.
-            void* retailReturnArm9Transition = (void*)mainMemoryArenaLo;
-            memcpy(retailReturnArm9Transition, sRetailReturnArm9Transition, sizeof(sRetailReturnArm9Transition));
-            patch_retailhotkeydetect_arm9_transition_address = (u32)retailReturnArm9Transition;
-            mainMemoryArenaLo += sizeof(sRetailReturnArm9Transition);
-            LOG_DEBUG("Retail return ARM9 transition reserved at 0x%p\n", retailReturnArm9Transition);
-
             patchCollection.AddPatch(new RetailHotkeyDetectionPatch());
         }
 
@@ -191,6 +163,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         // The arm7 patcher uses the fact that the ntr wram is mirrored over the entire 03 region.
         // Since the reserved patch space is smaller than the ntr wram, it will never overlap.
         // As a result, the patcher can use arm7 addresses for placing patches.
+        // The arm7 will copy the patch data to the actual arm7 location afterwards.
 
         // If in DSi mode and the rom is a DSi rom, temporarily disable twl wram to let ntr wram cover the entire 03 region.
         u32 mbk6 = 0;
