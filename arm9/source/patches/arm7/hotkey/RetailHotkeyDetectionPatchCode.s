@@ -44,12 +44,20 @@ check_hotkey:
     movs r3, #0
     strh r3, [r2]
 
-    ldr r2, arm7ResetVectorAddress
-    adr r3, patch_retailhotkeydetect_postreset_arm
-    str r3, [r2]
-    swi 0x00
+    // DSi/TWL power-management reboot path used by nds-bootstrap/TWiLight.
+    // Set warmboot flag first, then request reboot via the ARM7 I2C controller.
+    movs r0, #0x70
+    movs r1, #1
+    bl patch_retailhotkeydetect_i2c_pm_write
 
-    b detection_done
+    movs r0, #0x11
+    movs r1, #1
+    bl patch_retailhotkeydetect_i2c_pm_write
+
+    // Successful reboot never returns. If unsupported/blocked in this mode,
+    // keep ARM7 parked so the result is unambiguous and do not touch ARM9.
+1:
+    b 1b
 
 clear_state:
     adr r2, holdCounter
@@ -68,8 +76,6 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-arm7ResetVectorAddress:
-    .word 0x02FFFE34
 hotkeyMask:
     .word 0x00000384
 
@@ -78,70 +84,103 @@ holdCounter:
 firedFlag:
     .word 0
 
+// r0 = PM register, r1 = data. Returns r0 = 1 on ACK, 0 on failure.
+// Implements the same register transaction sequence as libnds/TWiLight i2cWriteRegister.
+.thumb
+.type patch_retailhotkeydetect_i2c_pm_write, %function
+patch_retailhotkeydetect_i2c_pm_write:
+    push {r2-r7, lr}
+    mov r6, r0
+    mov r7, r1
+    movs r5, #8
+
+i2c_retry:
+    ldr r2, i2cDataAddr
+    ldr r3, i2cCntAddr
+
+    // Wait until bus idle.
+i2c_wait0:
+    ldrb r4, [r3]
+    movs r0, #0x80
+    tst r4, r0
+    bne i2c_wait0
+
+    // Select PM device 0x4A.
+    movs r4, #0x4A
+    strb r4, [r2]
+    movs r4, #0xC2
+    strb r4, [r3]
+
+i2c_wait1:
+    ldrb r4, [r3]
+    movs r0, #0x80
+    tst r4, r0
+    bne i2c_wait1
+    movs r0, #0x10
+    tst r4, r0
+    beq i2c_fail
+
+    bl i2c_pm_delay
+
+    // Select PM register.
+    strb r6, [r2]
+    movs r4, #0xC0
+    strb r4, [r3]
+
+i2c_wait2:
+    ldrb r4, [r3]
+    movs r0, #0x80
+    tst r4, r0
+    bne i2c_wait2
+    movs r0, #0x10
+    tst r4, r0
+    beq i2c_fail
+
+    bl i2c_pm_delay
+
+    // Write data and stop transaction.
+    strb r7, [r2]
+    movs r4, #0xC0
+    strb r4, [r3]
+    bl i2c_pm_delay
+    movs r4, #0xC5
+    strb r4, [r3]
+
+i2c_wait3:
+    ldrb r4, [r3]
+    movs r0, #0x80
+    tst r4, r0
+    bne i2c_wait3
+    movs r0, #0x10
+    tst r4, r0
+    beq i2c_fail
+
+    movs r0, #1
+    pop {r2-r7, pc}
+
+i2c_fail:
+    movs r4, #0xC5
+    strb r4, [r3]
+    subs r5, #1
+    bne i2c_retry
+    movs r0, #0
+    pop {r2-r7, pc}
+
+.type i2c_pm_delay, %function
+i2c_pm_delay:
+    push {r0, lr}
+    movs r0, #0x60
+    lsls r0, r0, #2
+2:
+    subs r0, #1
+    bne 2b
+    pop {r0, pc}
+
 .balign 4
-.arm
-.global patch_retailhotkeydetect_postreset_arm
-.type patch_retailhotkeydetect_postreset_arm, %function
-patch_retailhotkeydetect_postreset_arm:
-    ldr r0, arm9StubAddress
-    ldr r1, arm9Stub0
-    str r1, [r0, #0]
-    ldr r1, arm9Stub1
-    str r1, [r0, #4]
-    ldr r1, arm9Stub2
-    str r1, [r0, #8]
-    ldr r1, arm9Stub3
-    str r1, [r0, #12]
-    ldr r1, arm9Stub4
-    str r1, [r0, #16]
-    ldr r1, arm9Stub5
-    str r1, [r0, #20]
-    ldr r1, arm9Stub6
-    str r1, [r0, #24]
-    ldr r1, arm9Stub7
-    str r1, [r0, #28]
-    ldr r1, arm9Stub8
-    str r1, [r0, #32]
-
-    ldr r0, arm9ResetVectorAddress
-    ldr r1, arm9StubAddress
-    str r1, [r0]
-
-    ldr r0, ipcFifoTx
-    ldr r1, arm9ResetCommand
-    str r1, [r0]
-
-1:
-    b 1b
-
-.balign 4
-arm9ResetVectorAddress:
-    .word 0x02FFFE24
-ipcFifoTx:
-    .word 0x04000188
-arm9ResetCommand:
-    .word 0x0C04000C
-arm9StubAddress:
-    .word 0x02300000
-
-arm9Stub0:
-    .word 0xE59F0014
-arm9Stub1:
-    .word 0xE59F1014
-arm9Stub2:
-    .word 0xE1C010B0
-arm9Stub3:
-    .word 0xE59F0010
-arm9Stub4:
-    .word 0xE1C010B0
-arm9Stub5:
-    .word 0xEAFFFFFE
-arm9Stub6:
-    .word 0x0400006C
-arm9Stub7:
-    .word 0x0000401F
-arm9Stub8:
-    .word 0x0400106C
+i2cDataAddr:
+    .word 0x04004500
+i2cCntAddr:
+    .word 0x04004501
 
 .pool
 .end
