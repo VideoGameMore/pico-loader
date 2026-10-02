@@ -40,25 +40,14 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
+    // Probe the DSpico cartridge-side custom command path directly.
+    // E4 (GET_SD_STAT) is read-only. Only mute if a cartridge response arrives.
+    bl patch_retailhotkeydetect_dspico_probe
+    cmp r0, #0
+    beq detection_done
+
     ldr r2, regSoundCnt
     movs r3, #0
-    strh r3, [r2]
-
-    // DSi/TWL power-management reboot path used by nds-bootstrap/TWiLight.
-    // Set warmboot flag first, then request reboot via the ARM7 I2C controller.
-    movs r0, #0x70
-    movs r1, #1
-    bl patch_retailhotkeydetect_i2c_pm_write
-
-    movs r0, #0x11
-    movs r1, #1
-    bl patch_retailhotkeydetect_i2c_pm_write
-
-    // A successful reboot never returns. If both writes return, restore sound
-    // and return to the game so we can distinguish a failed reboot from an
-    // ARM7 park-induced freeze.
-    ldr r2, regSoundCnt
-    ldr r3, soundCntEnabled
     strh r3, [r2]
     b detection_done
 
@@ -79,8 +68,6 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
-soundCntEnabled:
-    .word 0x0000807F
 hotkeyMask:
     .word 0x00000384
 
@@ -89,103 +76,61 @@ holdCounter:
 firedFlag:
     .word 0
 
-// r0 = PM register, r1 = data. Returns r0 = 1 on ACK, 0 on failure.
-// Implements the same register transaction sequence as libnds/TWiLight i2cWriteRegister.
+// Returns r0=1 if the DSpico answers the custom E4 command, else r0=0.
+// All waits are bounded so a busy cartridge bus cannot hang ARM7 indefinitely.
 .thumb
-.type patch_retailhotkeydetect_i2c_pm_write, %function
-patch_retailhotkeydetect_i2c_pm_write:
-    push {r2-r7, lr}
-    movs r6, r0
-    movs r7, r1
-    movs r5, #8
+.type patch_retailhotkeydetect_dspico_probe, %function
+patch_retailhotkeydetect_dspico_probe:
+    ldr r2, cardRegBase
 
-i2c_retry:
-    ldr r2, i2cDataAddr
-    ldr r3, i2cCntAddr
-
-    // Wait until bus idle.
-i2c_wait0:
-    ldrb r4, [r3]
-    movs r0, #0x80
-    tst r4, r0
-    bne i2c_wait0
-
-    // Select PM device 0x4A.
-    movs r4, #0x4A
-    strb r4, [r2]
-    movs r4, #0xC2
-    strb r4, [r3]
-
-i2c_wait1:
-    ldrb r4, [r3]
-    movs r0, #0x80
-    tst r4, r0
-    bne i2c_wait1
-    movs r0, #0x10
-    tst r4, r0
-    beq i2c_fail
-
-    bl i2c_pm_delay
-
-    // Select PM register.
-    strb r6, [r2]
-    movs r4, #0xC0
-    strb r4, [r3]
-
-i2c_wait2:
-    ldrb r4, [r3]
-    movs r0, #0x80
-    tst r4, r0
-    bne i2c_wait2
-    movs r0, #0x10
-    tst r4, r0
-    beq i2c_fail
-
-    bl i2c_pm_delay
-
-    // Write data and stop transaction.
-    strb r7, [r2]
-    movs r4, #0xC0
-    strb r4, [r3]
-    bl i2c_pm_delay
-    movs r4, #0xC5
-    strb r4, [r3]
-
-i2c_wait3:
-    ldrb r4, [r3]
-    movs r0, #0x80
-    tst r4, r0
-    bne i2c_wait3
-    movs r0, #0x10
-    tst r4, r0
-    beq i2c_fail
-
-    movs r0, #1
-    pop {r2-r7, pc}
-
-i2c_fail:
-    movs r4, #0xC5
-    strb r4, [r3]
+    // Wait for any in-flight card transfer to finish.
+    ldr r5, probeTimeout
+probe_wait_idle:
+    ldrb r3, [r2, #0x0F]
+    lsrs r3, r3, #8
+    bcc probe_idle
     subs r5, #1
-    bne i2c_retry
+    bne probe_wait_idle
     movs r0, #0
-    pop {r2-r7, pc}
+    bx lr
 
-.type i2c_pm_delay, %function
-i2c_pm_delay:
-    push {r0, lr}
-    movs r0, #0x60
-    lsls r0, r0, #2
-2:
-    subs r0, #1
-    bne 2b
-    pop {r0, pc}
+probe_idle:
+    // card_romSetCmd(0xE400000000000000ull)
+    movs r3, #0xE4
+    str r3, [r2, #0x10]
+    movs r3, #0
+    str r3, [r2, #0x14]
+
+    // One-word DSpico status transfer.
+    ldr r3, probeTransferSettings
+    str r3, [r2, #0x0C]
+
+    ldr r5, probeTimeout
+probe_wait_data:
+    ldrb r3, [r2, #0x0E]
+    lsrs r3, r3, #8
+    bcs probe_got_data
+    subs r5, #1
+    bne probe_wait_data
+    movs r0, #0
+    bx lr
+
+probe_got_data:
+    // Consume the returned status word so the transfer can complete cleanly.
+    ldr r3, cardDataReg
+    ldr r3, [r3]
+    movs r0, #1
+    bx lr
 
 .balign 4
-i2cDataAddr:
-    .word 0x04004500
-i2cCntAddr:
-    .word 0x04004501
+cardRegBase:
+    .word 0x04000198
+cardDataReg:
+    .word 0x04100010
+probeTransferSettings:
+    .word 0xA7446000
+probeTimeout:
+    .word 0x00020000
 
 .pool
 .end
