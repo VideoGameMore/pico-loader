@@ -62,24 +62,6 @@ bool OSResetSystemPatch::FindPatchTarget(PatchContext& patchContext)
 
 void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
 {
-    // Test 82: publish the first physical sector of picoLoader9.bin in a tiny
-    // shared handoff block before the boot-safe OS_ResetSystem guard.  Mario
-    // Kart does not expose a recognized reset target, but ARM7 can still use
-    // this precomputed sector with the DSpico E3/E4/E5 path proven in Test 81.
-    // FatFs CLMT layout is [table-size, cluster-count, start-cluster, ...].
-    if (_loaderInfo && _loaderInfo->clusterMap9[1] != 0 && _loaderInfo->clusterMap9[2] >= 2)
-    {
-        const u32 firstLoader9Sector =
-            ((_loaderInfo->clusterMap9[2] - 2) << _loaderInfo->clusterShift) + _loaderInfo->database;
-        *(vu32*)0x02FFFDE8 = 0x4C445238; // "LDR8" - Test 82 loader-sector handoff signature
-        *(vu32*)0x02FFFDEC = firstLoader9Sector;
-    }
-    else
-    {
-        *(vu32*)0x02FFFDE8 = 0;
-        *(vu32*)0x02FFFDEC = 0;
-    }
-
     // Keep the proven boot-safe guard. The large reset path is only allocated
     // for games where OS_ResetSystem was actually recognized.
     if (!_osResetSystem)

@@ -40,16 +40,15 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 82: use the loader-sector handoff published by ARM9 at patch time,
-    // then read the first physical sector of picoLoader9.bin through the same
-    // DSpico E3/E4/E5 path that Test 81 proved works during retail gameplay.
-    // Audio only mutes if the shared handoff is valid AND the loader sector is
-    // successfully returned, making this the first test aimed at rebootstrap
-    // data rather than an arbitrary SD sector.
+    // Test 83: pure ARM7 runtime path. The physical first sector of
+    // picoLoader9.bin is patched directly into this ARM7 payload before the
+    // retail game starts. There is no runtime ARM9 mailbox/handoff.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
 
+    // Observable PASS marker: mute only after the actual picoLoader9 sector
+    // has completed E3 -> E4 -> E5 entirely from this ARM7 hotkey path.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -80,20 +79,10 @@ holdCounter:
 firedFlag:
     .word 0
 
-// Returns r0=1 only after the first physical sector of picoLoader9.bin has
-// completed a full E3 request -> E4 status -> E5 512-byte data transaction.
 .thumb
 .type patch_retailhotkeydetect_dspico_loader_probe, %function
 patch_retailhotkeydetect_dspico_loader_probe:
-    // Require the Test-82 handoff signature before trusting the sector word.
-    ldr r2, loaderHandoffSignatureAddress
-    ldr r3, [r2]
-    ldr r4, loaderHandoffSignatureValue
-    cmp r3, r4
-    bne read_failed
-
-    ldr r2, loaderFirstSectorAddress
-    ldr r4, [r2]
+    ldr r4, patch_retailhotkeydetect_loaderSector
     cmp r4, #0
     beq read_failed
 
@@ -110,17 +99,16 @@ read_wait_idle:
     b read_failed
 
 read_idle:
-    // Enable/start the DSpico card interface. Tests 80/81 proved this is
-    // required before our injected ARM7 code can issue extended commands.
+    // Match the known-good DSpico path from Tests 80/81.
     movs r3, #0x80
     strb r3, [r2, #0x09]
 
-    // E3 xx xx xx SS SS SS SS: request the loader's first physical sector.
-    // Match the byte packing used by DSPicoReadSdSectorsPatchCode.s.
+    // E3: request the first physical sector of picoLoader9.bin.
+    // Byte packing mirrors DSPicoReadSdSectorsPatchCode.s.
     movs r3, #0xE3
     str r3, [r2, #0x10]
     movs r3, r4
-    rors r3, r2              // 0x04000198 & 31 = rotate right 24
+    rors r3, r2              // ror 24 because 0x04000198 & 31 == 24
     str r3, [r2, #0x14]
     strb r4, [r2, #0x17]
     lsrs r3, r4, #16
@@ -128,7 +116,6 @@ read_idle:
     ldr r3, readRequestSettings
     str r3, [r2, #0x0C]
 
-    // Wait for the request command itself to leave the card bus.
     ldr r5, probeTimeout
 read_wait_request_done:
     ldrb r3, [r2, #0x0F]
@@ -139,7 +126,7 @@ read_wait_request_done:
     b read_failed
 
 read_poll_status:
-    // E4: poll until the loader-sector SD operation completes.
+    // E4: wait for the requested SD sector to complete.
     movs r3, #0xE4
     str r3, [r2, #0x10]
     movs r3, #0
@@ -182,7 +169,8 @@ read_wait_before_e5:
     b read_failed
 
 read_start_e5:
-    // E5: fetch and drain all 512 bytes of the actual Pico Loader sector.
+    // E5: receive all 512 bytes. Drain for this diagnostic; later tests can
+    // place the loader data into a controlled ARM7-owned buffer.
     movs r3, #0xE5
     str r3, [r2, #0x10]
     movs r3, #0
@@ -215,12 +203,9 @@ read_failed:
     bx lr
 
 .balign 4
-loaderHandoffSignatureAddress:
-    .word 0x02FFFDE8
-loaderFirstSectorAddress:
-    .word 0x02FFFDEC
-loaderHandoffSignatureValue:
-    .word 0x4C445238
+.global patch_retailhotkeydetect_loaderSector
+patch_retailhotkeydetect_loaderSector:
+    .word 0
 cardRegBase:
     .word 0x04000198
 cardDataReg:
