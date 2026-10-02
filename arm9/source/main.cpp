@@ -179,14 +179,14 @@ static void handleInitializeLoaderInfoCommand()
     dc_invalidateRange(TWL_SHARED_MEMORY->ntrSharedMem.cardRomHeader, sizeof(loader_info_t));
     memcpy(&sLoaderInfo, TWL_SHARED_MEMORY->ntrSharedMem.cardRomHeader, sizeof(loader_info_t));
 
-    // Test 83: calculate the first physical sector of picoLoader9.bin while
-    // Pico Loader still owns the machine, then bake that value into the ARM7
-    // patch template. Once the retail game starts, ARM9 is not consulted.
+    // Test 84: target picoLoader7.bin, the ARM7-side loader payload. Compute
+    // its first physical sector before the retail game starts and bake it into
+    // the ARM7 hotkey patch. Runtime remains entirely ARM7 + DSpico.
     patch_retailhotkeydetect_loaderSector = 0;
-    if (sLoaderInfo.clusterMap9[1] != 0 && sLoaderInfo.clusterMap9[2] >= 2)
+    if (sLoaderInfo.clusterMap7[1] != 0 && sLoaderInfo.clusterMap7[2] >= 2)
     {
         patch_retailhotkeydetect_loaderSector =
-            ((sLoaderInfo.clusterMap9[2] - 2) << sLoaderInfo.clusterShift) + sLoaderInfo.database;
+            ((sLoaderInfo.clusterMap7[2] - 2) << sLoaderInfo.clusterShift) + sLoaderInfo.database;
     }
 
     dc_flushAll();
