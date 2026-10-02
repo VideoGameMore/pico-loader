@@ -54,10 +54,13 @@ check_hotkey:
     movs r1, #1
     bl patch_retailhotkeydetect_i2c_pm_write
 
-    // Successful reboot never returns. If unsupported/blocked in this mode,
-    // keep ARM7 parked so the result is unambiguous and do not touch ARM9.
-1:
-    b 1b
+    // A successful reboot never returns. If both writes return, restore sound
+    // and return to the game so we can distinguish a failed reboot from an
+    // ARM7 park-induced freeze.
+    ldr r2, regSoundCnt
+    ldr r3, soundCntEnabled
+    strh r3, [r2]
+    b detection_done
 
 clear_state:
     adr r2, holdCounter
@@ -76,6 +79,8 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
+soundCntEnabled:
+    .word 0x0000807F
 hotkeyMask:
     .word 0x00000384
 
