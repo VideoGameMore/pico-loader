@@ -40,13 +40,13 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 81: go beyond the successful E4 status probe from Test 80.
-    // Perform a complete DSpico sector-0 read transaction (E3 -> E4 -> E5)
-    // and only mute audio after all 512 bytes have been returned and drained.
-    // This proves the injected ARM7 path can actually read from the DSpico SD
-    // interface while a retail title is running, which is the prerequisite for
-    // an ARM7-driven rebootstrap path that does not depend on fragile game hooks.
-    bl patch_retailhotkeydetect_dspico_read_probe
+    // Test 82: use the loader-sector handoff published by ARM9 at patch time,
+    // then read the first physical sector of picoLoader9.bin through the same
+    // DSpico E3/E4/E5 path that Test 81 proved works during retail gameplay.
+    // Audio only mutes if the shared handoff is valid AND the loader sector is
+    // successfully returned, making this the first test aimed at rebootstrap
+    // data rather than an arbitrary SD sector.
+    bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
 
@@ -80,11 +80,23 @@ holdCounter:
 firedFlag:
     .word 0
 
-// Returns r0=1 only after a complete DSpico read of SD sector 0 succeeds.
-// Every wait is bounded so an unavailable or busy card bus returns cleanly.
+// Returns r0=1 only after the first physical sector of picoLoader9.bin has
+// completed a full E3 request -> E4 status -> E5 512-byte data transaction.
 .thumb
-.type patch_retailhotkeydetect_dspico_read_probe, %function
-patch_retailhotkeydetect_dspico_read_probe:
+.type patch_retailhotkeydetect_dspico_loader_probe, %function
+patch_retailhotkeydetect_dspico_loader_probe:
+    // Require the Test-82 handoff signature before trusting the sector word.
+    ldr r2, loaderHandoffSignatureAddress
+    ldr r3, [r2]
+    ldr r4, loaderHandoffSignatureValue
+    cmp r3, r4
+    bne read_failed
+
+    ldr r2, loaderFirstSectorAddress
+    ldr r4, [r2]
+    cmp r4, #0
+    beq read_failed
+
     ldr r2, cardRegBase
 
     // Wait for any in-flight retail card transfer to finish.
@@ -98,17 +110,21 @@ read_wait_idle:
     b read_failed
 
 read_idle:
-    // Enable/start the DSpico card interface. Test 80 proved this is required
-    // before the injected ARM7 code can issue the extended card commands.
+    // Enable/start the DSpico card interface. Tests 80/81 proved this is
+    // required before our injected ARM7 code can issue extended commands.
     movs r3, #0x80
     strb r3, [r2, #0x09]
 
-    // E3: request SD sector 0. Sector 0 keeps this diagnostic independent of
-    // loader layout/cluster metadata; the payload is read and discarded.
+    // E3 xx xx xx SS SS SS SS: request the loader's first physical sector.
+    // Match the byte packing used by DSPicoReadSdSectorsPatchCode.s.
     movs r3, #0xE3
     str r3, [r2, #0x10]
-    movs r3, #0
+    movs r3, r4
+    rors r3, r2              // 0x04000198 & 31 = rotate right 24
     str r3, [r2, #0x14]
+    strb r4, [r2, #0x17]
+    lsrs r3, r4, #16
+    strb r3, [r2, #0x15]
     ldr r3, readRequestSettings
     str r3, [r2, #0x0C]
 
@@ -123,7 +139,7 @@ read_wait_request_done:
     b read_failed
 
 read_poll_status:
-    // E4: poll until the requested SD operation completes.
+    // E4: poll until the loader-sector SD operation completes.
     movs r3, #0xE4
     str r3, [r2, #0x10]
     movs r3, #0
@@ -146,8 +162,6 @@ read_status_ready:
     cmp r3, #0
     bne read_fetch_sector
 
-    // SD operation is still pending. Wait for this status command to finish
-    // before issuing the next E4 poll.
     ldr r5, probeTimeout
 read_wait_status_done:
     ldrb r3, [r2, #0x0F]
@@ -158,7 +172,6 @@ read_wait_status_done:
     b read_failed
 
 read_fetch_sector:
-    // Ensure the E4 transfer is fully idle before starting E5.
     ldr r5, probeTimeout
 read_wait_before_e5:
     ldrb r3, [r2, #0x0F]
@@ -169,7 +182,7 @@ read_wait_before_e5:
     b read_failed
 
 read_start_e5:
-    // E5: fetch the 512-byte sector payload.
+    // E5: fetch and drain all 512 bytes of the actual Pico Loader sector.
     movs r3, #0xE5
     str r3, [r2, #0x10]
     movs r3, #0
@@ -177,8 +190,6 @@ read_start_e5:
     ldr r3, dataTransferSettings
     str r3, [r2, #0x0C]
 
-    // Drain all 128 words. We do not store the diagnostic sector; reaching the
-    // end of this loop is the observable proof that the full read path works.
     movs r4, #128
 read_drain_words:
     ldr r5, probeTimeout
@@ -204,6 +215,12 @@ read_failed:
     bx lr
 
 .balign 4
+loaderHandoffSignatureAddress:
+    .word 0x02FFFDE8
+loaderFirstSectorAddress:
+    .word 0x02FFFDEC
+loaderHandoffSignatureValue:
+    .word 0x4C445238
 cardRegBase:
     .word 0x04000198
 cardDataReg:
