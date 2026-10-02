@@ -40,15 +40,15 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 83: pure ARM7 runtime path. The physical first sector of
-    // picoLoader9.bin is patched directly into this ARM7 payload before the
-    // retail game starts. There is no runtime ARM9 mailbox/handoff.
+    // Test 85: pure ARM7 runtime path. Read the first physical sector of
+    // picoLoader7.bin and STORE all 512 bytes into memory owned by this ARM7
+    // patch rather than discarding them. No runtime ARM9 handoff is used.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
 
-    // Observable PASS marker: mute only after the actual picoLoader9 sector
-    // has completed E3 -> E4 -> E5 entirely from this ARM7 hotkey path.
+    // Observable PASS marker: mute only after all 512 bytes have been written
+    // into the ARM7-owned loaderSectorBuffer below.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -99,11 +99,11 @@ read_wait_idle:
     b read_failed
 
 read_idle:
-    // Match the known-good DSpico path from Tests 80/81.
+    // Match the known-good DSpico path from Tests 80/81/83/84.
     movs r3, #0x80
     strb r3, [r2, #0x09]
 
-    // E3: request the first physical sector of picoLoader9.bin.
+    // E3: request the first physical sector of picoLoader7.bin.
     // Byte packing mirrors DSPicoReadSdSectorsPatchCode.s.
     movs r3, #0xE3
     str r3, [r2, #0x10]
@@ -169,8 +169,7 @@ read_wait_before_e5:
     b read_failed
 
 read_start_e5:
-    // E5: receive all 512 bytes. Drain for this diagnostic; later tests can
-    // place the loader data into a controlled ARM7-owned buffer.
+    // E5: receive 512 bytes into an ARM7-owned buffer inside this patch.
     movs r3, #0xE5
     str r3, [r2, #0x10]
     movs r3, #0
@@ -178,8 +177,9 @@ read_start_e5:
     ldr r3, dataTransferSettings
     str r3, [r2, #0x0C]
 
+    adr r1, loaderSectorBuffer
     movs r4, #128
-read_drain_words:
+read_store_words:
     ldr r5, probeTimeout
 read_wait_word:
     ldrb r3, [r2, #0x0E]
@@ -192,8 +192,10 @@ read_wait_word:
 read_word_ready:
     ldr r3, cardDataReg
     ldr r3, [r3]
+    str r3, [r1]
+    adds r1, #4
     subs r4, #1
-    bne read_drain_words
+    bne read_store_words
 
     movs r0, #1
     bx lr
@@ -218,6 +220,12 @@ dataTransferSettings:
     .word 0xA1444000
 probeTimeout:
     .word 0x00020000
+
+// Controlled ARM7-owned staging buffer for the first sector of picoLoader7.
+// Test 85 proves we can populate this without disturbing the running game.
+.balign 4
+loaderSectorBuffer:
+    .space 512
 
 .pool
 .end
