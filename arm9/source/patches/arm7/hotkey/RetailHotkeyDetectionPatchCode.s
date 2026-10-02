@@ -95,6 +95,11 @@ probe_wait_idle:
     bx lr
 
 probe_idle:
+    // Match the known-good DSPico SD request path: enable/start the card
+    // interface before issuing a custom command from this injected ARM7 code.
+    movs r3, #0x80
+    strb r3, [r2, #0x09]
+
     // card_romSetCmd(0xE400000000000000ull)
     movs r3, #0xE4
     str r3, [r2, #0x10]
