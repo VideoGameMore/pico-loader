@@ -40,13 +40,14 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 87: stage two consecutive 512-byte sectors from picoLoader7.bin
-    // into ARM7-owned RAM. Runtime remains entirely ARM7 + DSpico.
+    // Test 88: keep the proven 512-byte ARM7 staging footprint from Test 86.
+    // Read picoLoader7 sector 0, validate it, then reuse the SAME 512-byte
+    // buffer for sector 1 and validate that sector separately. This isolates
+    // Test 87's white-screen boot failure from its doubled in-patch buffer.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
 
-    // PASS marker only after both sectors are read/stored and validated.
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -84,11 +85,47 @@ patch_retailhotkeydetect_dspico_loader_probe:
     cmp r4, #0
     beq read_failed
 
-    ldr r2, cardRegBase
-    adr r1, loaderSectorBuffer
-    movs r0, #2
+    // Read and stage the first sector.
+    bl read_one_sector
+    cmp r0, #0
+    beq read_failed
 
-read_next_sector:
+    // Validate the known first-sector header before reusing the buffer.
+    adr r1, loaderSectorBuffer
+    ldr r3, [r1]
+    ldr r5, expectedHeaderWord0
+    cmp r3, r5
+    bne read_failed
+    ldr r3, [r1, #8]
+    ldr r5, expectedHeaderWord8
+    cmp r3, r5
+    bne read_failed
+
+    // Advance one physical sector and reuse the same 512-byte buffer.
+    adds r4, #1
+    bl read_one_sector
+    cmp r0, #0
+    beq read_failed
+
+    // In this build sector +1 begins with zeroes. This confirms we advanced
+    // to the next sector without increasing the ARM7 patch staging footprint.
+    adr r1, loaderSectorBuffer
+    ldr r3, [r1]
+    cmp r3, #0
+    bne read_failed
+    ldr r3, [r1, #4]
+    cmp r3, #0
+    bne read_failed
+
+    movs r0, #1
+    bx lr
+
+// Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
+// Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
+read_one_sector:
+    push {r4, lr}
+    ldr r2, cardRegBase
+
     ldr r5, probeTimeout
 read_wait_idle:
     ldrb r3, [r2, #0x0F]
@@ -96,13 +133,12 @@ read_wait_idle:
     bcc read_idle
     subs r5, #1
     bne read_wait_idle
-    b read_failed
+    b read_one_failed
 
 read_idle:
     movs r3, #0x80
     strb r3, [r2, #0x09]
 
-    // E3: request current physical sector.
     movs r3, #0xE3
     str r3, [r2, #0x10]
     movs r3, r4
@@ -121,10 +157,9 @@ read_wait_request_done:
     bcc read_poll_status
     subs r5, #1
     bne read_wait_request_done
-    b read_failed
+    b read_one_failed
 
 read_poll_status:
-    // E4: poll SD operation completion.
     movs r3, #0xE4
     str r3, [r2, #0x10]
     movs r3, #0
@@ -139,7 +174,7 @@ read_wait_status_data:
     bcs read_status_ready
     subs r5, #1
     bne read_wait_status_data
-    b read_failed
+    b read_one_failed
 
 read_status_ready:
     ldr r3, cardDataReg
@@ -154,7 +189,7 @@ read_wait_status_done:
     bcc read_poll_status
     subs r5, #1
     bne read_wait_status_done
-    b read_failed
+    b read_one_failed
 
 read_fetch_sector:
     ldr r5, probeTimeout
@@ -164,10 +199,9 @@ read_wait_before_e5:
     bcc read_start_e5
     subs r5, #1
     bne read_wait_before_e5
-    b read_failed
+    b read_one_failed
 
 read_start_e5:
-    // E5: receive one complete 512-byte sector into staging RAM.
     movs r3, #0xE5
     str r3, [r2, #0x10]
     movs r3, #0
@@ -175,9 +209,9 @@ read_start_e5:
     ldr r3, dataTransferSettings
     str r3, [r2, #0x0C]
 
-    movs r5, #128
+    adr r1, loaderSectorBuffer
+    movs r4, #128
 read_store_words:
-    push {r5}
     ldr r5, probeTimeout
 read_wait_word:
     ldrb r3, [r2, #0x0E]
@@ -185,49 +219,22 @@ read_wait_word:
     bcs read_word_ready
     subs r5, #1
     bne read_wait_word
-    pop {r5}
-    b read_failed
+    b read_one_failed
 
 read_word_ready:
     ldr r3, cardDataReg
     ldr r3, [r3]
     str r3, [r1]
     adds r1, #4
-    pop {r5}
-    subs r5, #1
+    subs r4, #1
     bne read_store_words
 
-    // Advance to the next physical sector and repeat once.
-    adds r4, #1
-    subs r0, #1
-    bne read_next_sector
-
-    // First sector header must still match the known picoLoader7.bin data.
-    adr r1, loaderSectorBuffer
-    ldr r3, [r1]
-    ldr r4, expectedHeaderWord0
-    cmp r3, r4
-    bne read_failed
-    ldr r3, [r1, #8]
-    ldr r4, expectedHeaderWord8
-    cmp r3, r4
-    bne read_failed
-
-    // In this build the second 512-byte sector of picoLoader7.bin is zeroed.
-    // Confirm we actually advanced to sector +1 instead of reading sector 0
-    // twice. Checking its first two words is enough for this diagnostic.
-    movs r3, #128
-    lsls r3, r3, #2
-    adds r1, r3
-    ldr r3, [r1]
-    cmp r3, #0
-    bne read_failed
-    ldr r3, [r1, #4]
-    cmp r3, #0
-    bne read_failed
-
     movs r0, #1
-    bx lr
+    pop {r4, pc}
+
+read_one_failed:
+    movs r0, #0
+    pop {r4, pc}
 
 read_failed:
     movs r0, #0
@@ -254,10 +261,10 @@ expectedHeaderWord0:
 expectedHeaderWord8:
     .word 0x00030000
 
-// Two-sector ARM7-owned staging area (1024 bytes total).
+// Test 88 returns to the known-booting 512-byte staging footprint.
 .balign 4
 loaderSectorBuffer:
-    .space 1024
+    .space 512
 
 .pool
 .end
