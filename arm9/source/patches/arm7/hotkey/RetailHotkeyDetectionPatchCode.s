@@ -40,10 +40,9 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 88: keep the proven 512-byte ARM7 staging footprint from Test 86.
-    // Read picoLoader7 sector 0, validate it, then reuse the SAME 512-byte
-    // buffer for sector 1 and validate that sector separately. This isolates
-    // Test 87's white-screen boot failure from its doubled in-patch buffer.
+    // Test 89: same two-sector/single-buffer probe as Test 88, but preserve
+    // the probe's incoming LR across nested BL calls to read_one_sector.
+    // Test 88 could validate/mute yet corrupt its return path afterward.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -81,6 +80,7 @@ firedFlag:
 .thumb
 .type patch_retailhotkeydetect_dspico_loader_probe, %function
 patch_retailhotkeydetect_dspico_loader_probe:
+    push {lr}
     ldr r4, patch_retailhotkeydetect_loaderSector
     cmp r4, #0
     beq read_failed
@@ -118,7 +118,7 @@ patch_retailhotkeydetect_dspico_loader_probe:
     bne read_failed
 
     movs r0, #1
-    bx lr
+    pop {pc}
 
 // Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
 // Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
@@ -238,7 +238,7 @@ read_one_failed:
 
 read_failed:
     movs r0, #0
-    bx lr
+    pop {pc}
 
 .balign 4
 .global patch_retailhotkeydetect_loaderSector
@@ -261,7 +261,6 @@ expectedHeaderWord0:
 expectedHeaderWord8:
     .word 0x00030000
 
-// Test 88 returns to the known-booting 512-byte staging footprint.
 .balign 4
 loaderSectorBuffer:
     .space 512
