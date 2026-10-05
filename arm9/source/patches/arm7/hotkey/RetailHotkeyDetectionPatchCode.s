@@ -40,8 +40,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 92: validate the header and real ARM7 crt0 entry instructions,
-    // then retain Test 91's staged ARM execution/Thumb return diagnostic.
+    // Test 93: read the complete ARM7 loader through its SD extent map.
+    // Mute only after all file words match the expected additive checksum.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -79,67 +79,55 @@ firedFlag:
 .thumb
 .type patch_retailhotkeydetect_dspico_loader_probe, %function
 patch_retailhotkeydetect_dspico_loader_probe:
-    push {lr}
-    ldr r4, patch_retailhotkeydetect_loaderSector
-    cmp r4, #0
-    beq read_failed
+    push {r6, r7, lr}
+    movs r6, #0              // rolling 32-bit word sum
+    ldr r7, loaderWordCount
+    adr r5, patch_retailhotkeydetect_loaderExtents
 
-    // Read and stage the first sector.
+full_next_extent:
+    ldmia r5!, {r3, r4}      // sector count, first physical sector
+    cmp r3, #0
+    beq full_failed
+
+full_next_sector:
+    push {r3, r5}            // preserve extent state across the SD helper
     bl read_one_sector
     cmp r0, #0
-    beq read_failed
+    beq full_read_failed
 
-    // Validate the known first-sector header before reusing the buffer.
     adr r1, loaderSectorBuffer
-    ldr r3, [r1]
-    ldr r5, expectedHeaderWord0
-    cmp r3, r5
-    bne read_failed
-    ldr r3, [r1, #8]
-    ldr r5, expectedHeaderWord8
-    cmp r3, r5
-    bne read_failed
+    movs r2, #128
+    cmp r7, r2
+    bhs full_sum_words
+    movs r2, r7              // final sector: ignore bytes beyond file EOF
+full_sum_words:
+    ldr r0, [r1]
+    adds r6, r6, r0
+    adds r1, #4
+    subs r7, #1
+    subs r2, #1
+    bne full_sum_words
 
-    // Logical file sector 2 contains entry offset 0x414. ARM9 resolved
-    // its physical sector from the cluster map before game launch.
-    ldr r4, patch_retailhotkeydetect_loaderEntrySector
-    cmp r4, #0
-    beq read_failed
-    bl read_one_sector
-    cmp r0, #0
-    beq read_failed
+    pop {r3, r5}
+    cmp r7, #0
+    beq full_check_sum
+    adds r4, #1
+    subs r3, #1
+    bne full_next_sector
+    b full_next_extent
 
-    // Check actual ARM crt0 instructions at file offsets 0x414/0x418.
-    // These bytes are read from SD, not synthesized by the staged probe.
-    adr r1, loaderSectorBuffer
-    ldr r3, [r1, #20]
-    ldr r5, expectedEntryWord0
-    cmp r3, r5
-    bne read_failed
-    ldr r3, [r1, #24]
-    ldr r5, expectedEntryWord4
-    cmp r3, r5
-    bne read_failed
-
-    // Loader crt0 starts in ARM mode. Stage eight bytes, enter with BX
-    // using a word-aligned address, then BX LR back to the Thumb caller.
-    adr r1, loaderSectorBuffer
-    adr r3, stagedExecutionTemplate
-    ldr r5, [r3]
-    str r5, [r1]
-    ldr r5, [r3, #4]
-    str r5, [r1, #4]
-    bl execute_staged_probe
-    cmp r0, #0x5B
-    bne read_failed
-
+full_check_sum:
+    ldr r0, expectedLoaderSum
+    cmp r6, r0
+    bne full_failed
     movs r0, #1
-    pop {pc}
+    pop {r6, r7, pc}
 
-// BL sets the Thumb return address; BX enters the staged routine in ARM mode.
-// The enclosing probe already saved its own incoming LR.
-execute_staged_probe:
-    bx r1
+full_read_failed:
+    pop {r3, r5}
+full_failed:
+    movs r0, #0
+    pop {r6, r7, pc}
 
 // Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
 // Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
@@ -175,12 +163,16 @@ read_idle:
 read_wait_request_done:
     ldrb r3, [r2, #0x0F]
     lsrs r3, r3, #8
-    bcc read_poll_status
+    bcc read_begin_status
     subs r5, #1
     bne read_wait_request_done
     b read_one_failed
 
+read_begin_status:
+    movs r0, #255           // bound total E4 polls, not only each bus wait
 read_poll_status:
+    subs r0, #1
+    beq read_one_failed
     movs r3, #0xE4
     str r3, [r2, #0x10]
     movs r3, #0
@@ -257,21 +249,14 @@ read_one_failed:
     movs r0, #0
     pop {r4, pc}
 
-read_failed:
-    movs r0, #0
-    pop {pc}
-
 .balign 4
-.global patch_retailhotkeydetect_loaderSector
-patch_retailhotkeydetect_loaderSector:
-    .word 0
-.global patch_retailhotkeydetect_loaderEntrySector
-patch_retailhotkeydetect_loaderEntrySector:
-    .word 0
-expectedEntryWord0:
-    .word 0xE59F0028
-expectedEntryWord4:
-    .word 0xE5C00000
+.global patch_retailhotkeydetect_loaderExtents
+patch_retailhotkeydetect_loaderExtents:
+    .space 64               // seven count/start pairs plus zero terminator
+loaderWordCount:
+    .word 12112             // 48448 exact file bytes
+expectedLoaderSum:
+    .word 0x355637BE         // sum of all little-endian file words mod 2^32
 cardRegBase:
     .word 0x04000198
 cardDataReg:
@@ -284,15 +269,6 @@ dataTransferSettings:
     .word 0xA1444000
 probeTimeout:
     .word 0x00020000
-expectedHeaderWord0:
-    .word 0x06000414
-expectedHeaderWord8:
-    .word 0x00030000
-
-.balign 4
-stagedExecutionTemplate:
-    .word 0xE3A0005B        // ARM: mov r0, #0x5B
-    .word 0xE12FFF1E        // ARM: bx lr (return to Thumb)
 
 .balign 4
 loaderSectorBuffer:

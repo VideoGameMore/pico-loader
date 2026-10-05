@@ -59,5 +59,25 @@ launch and embeds it in the patch, accommodating a fragmented file. At buffer
 These values were inspected in the compiled Test 91 ARM7 binary. The real entry
 code is NOT executed: it disables IRQs and clears BSS, so it requires a complete
 loader and coordinated handoff. Retain Test 91's staged ARM token check.
-Buffer remains 512 bytes. Expected pass: boots/mutes/no freeze. Hardware pending.
+Buffer remains 512 bytes. Expected pass: boots/mutes/no freeze. Hardware PASS reported October 5: boots/mutes/no freeze.
 Deliver DSPico_Test_92.zip; replace only picoLoader7.bin and picoLoader9.bin.
+
+## Test 93: complete ARM7 payload read with additive checksum
+
+Purpose: establish complete file retrieval, rather than more header probes.
+Read all 48448 bytes (12112 words; 95 SD sectors) through precomputed CLMT physical
+extents, reusing the 512-byte buffer. Sum every file word modulo 2^32 and compare
+0x355637BE, measured from Test 92's compiled ARM7 binary. Exclude final-sector
+padding. Extent publication is bounded to seven runs plus a zero terminator;
+invalid/incomplete maps disable the probe. Total E4 status polls are now bounded.
+Pass still mutes and returns to gameplay; a short pause may occur while reading.
+This is a streaming read: the entire payload is not retained simultaneously.
+An additive checksum can collide; it is diagnostic evidence, not cryptographic
+or byte-for-byte identity validation. The binary size/sum must be rechecked after
+CI compilation. These constants must change if the ARM7 binary later changes.
+Hardware result pending. Deliver DSPico_Test_93.zip; replace only two loader bins.
+
+Direction after a pass: choose restart-memory placement and processor handoff.
+Existing OSResetSystemPatch only allocates the reset routine when its game reset
+signature is found. ARM7 file reads alone do not establish ARM9 control.
+Recap near Test 100 remains planned.

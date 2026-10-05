@@ -6,8 +6,7 @@ DEFINE_SECTION_SYMBOLS(patch_retailhotkeydetect);
 
 extern "C" void patch_retailhotkeydetect_entry_arm(void);
 extern "C" void patch_retailhotkeydetect_entry(void);
-extern "C" u32 patch_retailhotkeydetect_loaderSector;
-extern "C" u32 patch_retailhotkeydetect_loaderEntrySector;
+extern "C" u32 patch_retailhotkeydetect_loaderExtents[16];
 
 class RetailHotkeyDetectionPatchCode : public PatchCode
 {

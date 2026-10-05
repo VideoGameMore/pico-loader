@@ -179,40 +179,31 @@ static void handleInitializeLoaderInfoCommand()
     dc_invalidateRange(TWL_SHARED_MEMORY->ntrSharedMem.cardRomHeader, sizeof(loader_info_t));
     memcpy(&sLoaderInfo, TWL_SHARED_MEMORY->ntrSharedMem.cardRomHeader, sizeof(loader_info_t));
 
-    // Test 84: target picoLoader7.bin, the ARM7-side loader payload. Compute
-    // its first physical sector before the retail game starts and bake it into
-    // the ARM7 hotkey patch. Runtime remains entirely ARM7 + DSpico.
-    patch_retailhotkeydetect_loaderSector = 0;
-    if (sLoaderInfo.clusterMap7[1] != 0 && sLoaderInfo.clusterMap7[2] >= 2)
-    {
-        patch_retailhotkeydetect_loaderSector =
-            ((sLoaderInfo.clusterMap7[2] - 2) << sLoaderInfo.clusterShift) + sLoaderInfo.database;
-    }
-
-    // Test 92: resolve logical file sector 2 through the CLMT run list.
-    // A file may be fragmented, so first-sector + 2 is not assumed.
-    patch_retailhotkeydetect_loaderEntrySector = 0;
+    // Test 93: bake bounded physical extents for the complete 48448-byte
+    // ARM7 loader into the injected patch. No runtime ARM9 mailbox is needed.
+    memset(patch_retailhotkeydetect_loaderExtents, 0, 64);
+    u32 remainingSectors = 95; // ceil(48448 / 512)
+    u32 output = 0;
     if (sLoaderInfo.clusterShift < 32)
     {
-        u32 clusterOffset = 2u >> sLoaderInfo.clusterShift;
-        const u32 sectorInCluster = 2u & ((1u << sLoaderInfo.clusterShift) - 1u);
-        for (u32 i = 1; i + 1 < 16; i += 2)
+        for (u32 i = 1; i + 1 < 16 && remainingSectors != 0; i += 2)
         {
             const u32 count = sLoaderInfo.clusterMap7[i];
             const u32 start = sLoaderInfo.clusterMap7[i + 1];
             if (count == 0 || start < 2)
                 break;
-            if (clusterOffset < count)
-            {
-                const u64 physical = (((u64)start - 2 + clusterOffset)
-                    << sLoaderInfo.clusterShift) + sLoaderInfo.database + sectorInCluster;
-                if (physical <= 0xFFFFFFFFull)
-                    patch_retailhotkeydetect_loaderEntrySector = (u32)physical;
+            const u64 available = (u64)count << sLoaderInfo.clusterShift;
+            const u32 sectors = available < remainingSectors ? (u32)available : remainingSectors;
+            const u64 physical = ((u64)(start - 2) << sLoaderInfo.clusterShift) + sLoaderInfo.database;
+            if (physical == 0 || physical + sectors - 1 > 0xFFFFFFFFull)
                 break;
-            }
-            clusterOffset -= count;
+            patch_retailhotkeydetect_loaderExtents[output++] = sectors;
+            patch_retailhotkeydetect_loaderExtents[output++] = (u32)physical;
+            remainingSectors -= sectors;
         }
     }
+    if (remainingSectors != 0)
+        memset(patch_retailhotkeydetect_loaderExtents, 0, 64);
 
     dc_flushAll();
     dc_drainWriteBuffer();
