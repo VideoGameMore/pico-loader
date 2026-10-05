@@ -215,4 +215,20 @@ No loader execution, entry jump, BSS clearing, VRAM D mapping, or ARM7 park yet.
 Black screens now mean ARM9 parked; audio mute additionally supports full retained
 ARM7 payload/readback success. Audio continuing can indicate second-read/staging
 failure or ARM7 callback unavailable after park. Power-cycle after test.
-Hardware pending. Deliver DSPico_Test_101.zip; copy only two loader bins.
+Hardware FAIL October 5: after blackout audio froze on a sustained note,
+without mute. ARM9 park occurred; post-park transfer/verification did not reach
+success marker. The sustained note is not proof of VRAM access failure.
+Deliver DSPico_Test_101.zip; copy only two loader bins.
+
+## Test 102: isolate ARM7 VRAM C access after ARM9 park
+
+Keep Test 101 ARM9 mapping-before-ack and black-screen park. Keep the proven
+initial full-file read/checksum. Replace the entire post-ack full read/copy/sum
+with two word write/readback comparisons: 0x5A at 0x06000000 and 0xA5 at
+0x0600BD3C (last word of 48448-byte payload). Only mute if both match. This tests
+ARM7 callback reaching mapped VRAM at payload boundaries without post-park SD
+access. It does not prove a complete retained loader. Pre-request stagingCursor
+remains zero. Black+mute supports mapping/access and redirects investigation to
+post-park cartridge ownership/transfer or full-copy loop. Black+sustained audio
+leaves callback reachability or VRAM access unresolved. Power-cycle afterward.
+Hardware pending. Deliver DSPico_Test_102.zip; copy only two loader bins.

@@ -32,29 +32,18 @@ patch_retailhotkeydetect_entry:
     adr r2, ackPending
     movs r3, #0
     str r3, [r2]
-    // Test 101: acknowledged ARM9 has mapped VRAM C and parked.
-    adr r2, stagingCursor
-    ldr r3, stagingBase
-    str r3, [r2]
-    bl patch_retailhotkeydetect_dspico_loader_probe
-    adr r2, stagingCursor
-    movs r3, #0
-    str r3, [r2]
-    cmp r0, #0
-    beq detection_done
-
-    // Verify the complete retained payload after all sector writes.
+    // Test 102: isolate VRAM access without a post-park SD transfer.
     ldr r2, stagingBase
-    ldr r3, loaderWordCount
-    movs r4, #0
-staging_verify:
-    ldr r5, [r2]
-    adds r4, r4, r5
-    adds r2, #4
-    subs r3, #1
-    bne staging_verify
-    ldr r2, expectedLoaderSum
-    cmp r4, r2
+    movs r3, #0x5A
+    str r3, [r2]
+    ldr r4, [r2]
+    cmp r4, r3
+    bne detection_done
+    ldr r2, stagingEnd
+    movs r3, #0xA5
+    str r3, [r2]
+    ldr r4, [r2]
+    cmp r4, r3
     bne detection_done
     ldr r2, regSoundCnt
     movs r3, #0
@@ -207,6 +196,8 @@ stagingCursor:
     .word 0
 stagingBase:
     .word 0x06000000
+stagingEnd:
+    .word 0x0600BD3C
 
 // Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
 // Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
