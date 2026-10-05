@@ -18,6 +18,7 @@
 #include "patches/arm7/PokemonDownloaderArm7Patch.h"
 #include "patches/arm7/cheats/CheatEnginePatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatch.h"
+#include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 #include "Arm7Patcher.h"
 
 static u32 correctAddress(u32 address, const nds_header_ntr_t* romHeader)
@@ -36,6 +37,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
     void*& cheatsPtr, char*& bannerSavePathPtr, bool runInDSiMode) const
 {
     cheatsPtr = nullptr;
+    patch_retailhotkeydetect_dldiAddress = 0;
     auto romHeader = (const nds_header_ntr_t*)TWL_SHARED_MEMORY->ntrSharedMem.romHeader;
     auto twlRomHeader = (const nds_header_twl_t*)TWL_SHARED_MEMORY->twlRomHeader;
     ModuleParamsLocator moduleParamsLocator;
@@ -86,6 +88,13 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         const u32 arm7PatchSpaceSize = 0x800;
         void* privateWramHeapStart = arm7ArenaPatch->GetArm7PrivateWramArenaLo();
         u32 mainMemoryArenaLo = (u32)arm7ArenaPatch->GetMainMemoryArenaLo();
+        // Test 109: reserve persistent game-excluded storage for the real driver.
+        if (cheatsLength == 0)
+        {
+            patch_retailhotkeydetect_dldiAddress = correctAddress(mainMemoryArenaLo, romHeader);
+            mainMemoryArenaLo += 16 * 1024;
+        }
+
         if (0x0380F780 - (u32)privateWramHeapStart - 0x2100 >= arm7PatchSpaceSize)
         {
             patchSpaceStart = privateWramHeapStart;

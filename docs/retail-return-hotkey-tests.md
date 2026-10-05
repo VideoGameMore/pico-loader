@@ -349,4 +349,28 @@ source-backed hypothesis; user hardware result will determine sufficiency.
 No changes to on-disk ARM7 loader binary or its expected checksum.
 Expected: return to responsive Pico Loader with games; record empty/frozen shell,
 visible error or boot regression. Power-cycle if stuck.
-Hardware pending. Deliver DSPico_Test_108.zip; copy only two loader bins.
+Hardware FAIL October 5: returns to launcher with no games; touch opens layout
+settings but back arrow does not work. UI partially responds, unlike earlier
+report; CPU-mode fix did not restore storage-backed navigation.
+Deliver DSPico_Test_108.zip; copy only two loader bins.
+
+## Test 109: preserve real DLDI driver for the returning launcher
+
+Source review: fallback dldi_init handles a null driver using platform routines,
+but does not create a valid DLDI header. DldiDriver::PatchTo then rejects that
+buffer, so the launcher does not receive the working cold-boot driver. Launcher
+mount/enumeration behavior explains partially responsive UI with no files;
+this is a concrete missing-driver defect, not yet proof of sole hang cause.
+Reserve 16 KiB at the ARM7 game's main-memory arena before boot, advancing arena
+so game allocations exclude it. Publish address in ARM7 injected patch. Add a
+fourth ARM7-patch IPC response word; ARM7 loader consumes it and dldi_copyTo copies
+its working complete driver to the reserved address. On hotkey, staged ARM7
+header.dldiDriver receives this pointer before loader startup. Its dldi_init
+copies/relocates the driver into fresh loader storage before clearing main RAM,
+and can now patch the launcher stub with a valid real driver. No launcher file
+change. Keep Test 108 CPU-state normalization and Test 107 return machinery.
+ARM7 loader binary changes due to extra IPC/copy; recompute exact file size,
+word count, sector count and checksum after CI before delivering hardware ZIP.
+Both bins must be replaced together because IPC response schema changes.
+Expected: games visible, layout/back navigation responds, game launches.
+Hardware pending. Deliver DSPico_Test_109.zip; copy only two loader bins.

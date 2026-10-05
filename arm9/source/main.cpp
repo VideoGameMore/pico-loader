@@ -157,6 +157,7 @@ static void handleApplyArm7PatchesCommand(u32 cheatsLength)
     ipc_sendWordDirect((u32)patchSpaceStart);
     ipc_sendWordDirect((u32)cheats);
     ipc_sendWordDirect((u32)bannerSavePath);
+    ipc_sendWordDirect(patch_retailhotkeydetect_dldiAddress);
 }
 
 static void handleSetAPInfoCommand()

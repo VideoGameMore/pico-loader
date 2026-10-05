@@ -252,6 +252,8 @@ setup_launcher_header:
     ldr r0, launcherHeaderBase
     ldr r3, [r2]
     strh r3, [r0, #8] // boot drive; apiVersion at +10 stays intact
+    ldr r3, patch_retailhotkeydetect_dldiAddress
+    str r3, [r0, #4] // persisted original storage driver
     adds r2, #4
     ldrb r3, [r2]
     cmp r3, #0
@@ -268,8 +270,8 @@ launcher_copy_path:
     adds r5, #4
     subs r1, #1
     bne launcher_copy_path
-    // Fresh checksum-verified disk header already has null DLDI, save,
-    // argv and cheats fields. Missing DLDI uses loader's platform SD code.
+    // Fresh disk header has empty save/argv/cheats. The persisted real
+    // DLDI driver can now be relocated and patched into the launcher.
     movs r0, #1
     bx lr
 launcher_params_bad:
@@ -278,6 +280,9 @@ launcher_params_bad:
 .balign 4
 .global patch_retailhotkeydetect_loaderParamsAddress
 patch_retailhotkeydetect_loaderParamsAddress:
+    .word 0
+.global patch_retailhotkeydetect_dldiAddress
+patch_retailhotkeydetect_dldiAddress:
     .word 0
 launcherHeaderBase:
     .word 0x06000000

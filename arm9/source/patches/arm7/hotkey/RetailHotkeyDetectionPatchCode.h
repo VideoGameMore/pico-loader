@@ -8,6 +8,7 @@ extern "C" void patch_retailhotkeydetect_entry_arm(void);
 extern "C" void patch_retailhotkeydetect_entry(void);
 extern "C" u32 patch_retailhotkeydetect_loaderExtents[16];
 extern "C" u32 patch_retailhotkeydetect_loaderParamsAddress;
+extern "C" u32 patch_retailhotkeydetect_dldiAddress;
 
 class RetailHotkeyDetectionPatchCode : public PatchCode
 {
