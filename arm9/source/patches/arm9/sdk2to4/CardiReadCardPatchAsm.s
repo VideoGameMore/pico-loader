@@ -171,9 +171,9 @@ retailArm7CardOwner:
 retail_load_arm9:
     push {r4-r7,lr}
     // ARM7 is waiting in initIpc and no longer reading the card.
-    ldr r0, retailExmemCnt
+    ldr r0, retailLoadExmemCnt
     ldrh r1, [r0]
-    ldr r2, retailArm7CardOwner
+    ldr r2, retailLoadCardOwner
     bics r1, r2
     strh r1, [r0]
     ldr r0, retailVramA
@@ -222,6 +222,10 @@ retail_load_bad:
     pop {r4-r7,pc}
 
 .balign 4
+retailLoadExmemCnt:
+    .word 0x04000204
+retailLoadCardOwner:
+    .word 0x00000800
 retailVramA:
     .word 0x04000240
 retailArm9Base:
