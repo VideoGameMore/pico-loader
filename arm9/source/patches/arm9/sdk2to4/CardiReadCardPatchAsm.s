@@ -66,7 +66,7 @@ do_read:
     str r4, [r3]
     ldr r3, __patch_cardireadcard_sdread_asm_address
     blx r3
-    ldr r3, retailReadActiveAddress
+    adr r3, retailReadActive
     movs r4, #0
     str r4, [r3]
 
