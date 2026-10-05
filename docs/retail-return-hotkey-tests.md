@@ -137,5 +137,19 @@ Test: same game, hold hotkey until muted, then change menu or load/start a race
 to trigger cartridge reads. Mute plus visibly darker screens while gameplay
 continues confirms ARM9 participation. Mute alone confirms ARM7 but not ARM9.
 Boot failure means this bridge integration is not boot-safe on this game.
-Hardware pending. Deliver DSPico_Test_97.zip; copy only the two loader bins.
+Hardware result October 5: only muted; no screen marker reported. ARM9
+participation is unproven; post-hotkey cartridge reads were not explicitly confirmed.
+Deliver DSPico_Test_97.zip; copy only the two loader bins.
 Next recap near Test 100. Full reset remains unproven.
+
+## Test 98: unconditional ARM9 CPU-read marker
+
+Replace ONLY Test 97's conditional branch with a same-size Thumb NOP.
+Every execution of the existing CARDi CPU-read epilogue now writes 0x8008
+brightness on both screens regardless of IPCSYNC. ARM7 full-file checksum and
+hotkey mute remain unchanged. Watch screens during boot/menu/race loading before
+and after hotkey. Darkening proves this hook executes and its brightness marker
+is observable; it does not prove IPC request delivery. No darkening leaves hook
+reachability versus game brightness overwrite unresolved. Boot failure is failure.
+No reset attempted. Deliver DSPico_Test_98.zip; copy only two loader bins.
+Hardware pending. Recap near Test 100.

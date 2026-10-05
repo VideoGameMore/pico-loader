@@ -64,7 +64,8 @@ do_read:
     blx r3
 
 ignore_read:
-    // Test 97: consume a cache-independent ARM7 request only AFTER the
+    // Test 98: unconditional screen marker establishes hook reachability.
+    // Observe the ARM7 request only AFTER the
     // read inputs and cardi_common calculations have been consumed.
     // r1/r3 are restored by the original epilogue; preserve returned r0.
     push {r0}
@@ -73,7 +74,7 @@ ignore_read:
     movs r1, #15
     ands r3, r1
     cmp r3, #14
-    bne retail_bridge_done
+    nop // Test 98: mark every CPU read, independently of IPC request
     ldr r0, retailBrightMain
     ldr r1, retailDimValue
     strh r1, [r0]
