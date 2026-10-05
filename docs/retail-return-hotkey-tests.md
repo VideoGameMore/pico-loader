@@ -374,3 +374,6 @@ word count, sector count and checksum after CI before delivering hardware ZIP.
 Both bins must be replaced together because IPC response schema changes.
 Expected: games visible, layout/back navigation responds, game launches.
 Hardware pending. Deliver DSPico_Test_109.zip; copy only two loader bins.
+
+Test 109 compiled ARM7 payload: 48480 bytes, 12120 words, 95 sectors,
+additive checksum 0x0E2D6140. Final CI must match these refreshed constants.

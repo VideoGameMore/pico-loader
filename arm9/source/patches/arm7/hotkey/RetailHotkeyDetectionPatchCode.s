@@ -440,9 +440,9 @@ read_one_failed:
 patch_retailhotkeydetect_loaderExtents:
     .space 64               // seven count/start pairs plus zero terminator
 loaderWordCount:
-    .word 12112             // 48448 exact file bytes
+    .word 12120             // 48480 exact file bytes
 expectedLoaderSum:
-    .word 0x355637BE         // sum of all little-endian file words mod 2^32
+    .word 0x0E2D6140         // sum of all little-endian file words mod 2^32
 cardRegBase:
     .word 0x04000198
 cardDataReg:

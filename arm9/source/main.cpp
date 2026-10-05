@@ -188,10 +188,10 @@ static void handleInitializeLoaderInfoCommand()
     memcpy(&patch_cardireadcard_loaderParams[1], sLoaderInfo.launcherPath, 256);
     ((char*)&patch_cardireadcard_loaderParams[1])[255] = 0;
 
-    // Test 93: bake bounded physical extents for the complete 48448-byte
+    // Test 93: bake bounded physical extents for the complete 48480-byte
     // ARM7 loader into the injected patch. No runtime ARM9 mailbox is needed.
     memset(patch_retailhotkeydetect_loaderExtents, 0, 64);
-    u32 remainingSectors = 95; // ceil(48448 / 512)
+    u32 remainingSectors = 95; // ceil(48480 / 512)
     u32 output = 0;
     if (sLoaderInfo.clusterShift < 32)
     {
