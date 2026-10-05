@@ -231,4 +231,21 @@ access. It does not prove a complete retained loader. Pre-request stagingCursor
 remains zero. Black+mute supports mapping/access and redirects investigation to
 post-park cartridge ownership/transfer or full-copy loop. Black+sustained audio
 leaves callback reachability or VRAM access unresolved. Power-cycle afterward.
-Hardware pending. Deliver DSPico_Test_102.zip; copy only two loader bins.
+Hardware PASS October 5: blackout then silence, possibly a fraction later;
+no audio. Supports both VRAM boundary checks reaching success.
+Deliver DSPico_Test_102.zip; copy only two loader bins.
+
+## Test 103: restore full VRAM copy with explicit Slot-1 ownership
+
+Restore Test 101 ARM7 complete second transfer, staged payload and readback
+checksum unchanged. Keep Test 102-proven VRAM C mapping. Before acknowledgement,
+ARM9 sets EXMEMCNT bit 11 (0x0800) assigning Slot-1 to ARM7, preserving other
+bits. Existing BootstubPatchCode.s documents clearing 0x880 as assigning slots
+1/2 to ARM9. No Slot-2 ownership change. Then ARM9 acknowledges/blacks/parks.
+Hypothesis: the preceding ARM9 race read left Slot-1 assigned to ARM9, preventing
+ARM7's post-park SD commands. Initial pre-request reads previously passed, so
+this is a timing/ownership hypothesis, not established root cause.
+Pass: blackout followed by mute, supporting full 48448-byte retained payload
+with expected readback additive checksum. Failure: no mute/sustained note.
+No actual loader execution yet. Power-cycle afterward.
+Hardware pending. Deliver DSPico_Test_103.zip; copy only two loader bins.

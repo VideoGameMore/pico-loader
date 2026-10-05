@@ -91,6 +91,12 @@ retail_write_ack:
     ldr r0, retailVramC
     movs r1, #0x82
     strb r1, [r0]
+    // Test 103: transfer Slot-1 ownership to ARM7 before acknowledgement.
+    ldr r0, retailExmemCnt
+    ldrh r1, [r0]
+    ldr r3, retailArm7CardOwner
+    orrs r1, r3
+    strh r1, [r0]
     pop {r0,r3}
 retail_publish_ack:
     strh r3, [r0]
@@ -131,6 +137,10 @@ retailBlackValue:
     .word 0x00008010
 retailVramC:
     .word 0x04000242
+retailExmemCnt:
+    .word 0x04000204
+retailArm7CardOwner:
+    .word 0x00000800
 
 .global __patch_cardireadcard_fix_cp15_asm_address
 __patch_cardireadcard_fix_cp15_asm_address:
