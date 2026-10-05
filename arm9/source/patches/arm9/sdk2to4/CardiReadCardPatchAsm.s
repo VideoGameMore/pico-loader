@@ -91,6 +91,8 @@ retail_write_ack:
     ldr r0, retailVramC
     movs r1, #0x82
     strb r1, [r0]
+    movs r1, #0x8A // map VRAM D at ARM7 +128 KiB for loader heap
+    strb r1, [r0, #1]
     // Test 103: transfer Slot-1 ownership to ARM7 before acknowledgement.
     ldr r0, retailExmemCnt
     ldrh r1, [r0]
@@ -115,7 +117,20 @@ retail_publish_ack:
     ldr r0, retailBrightSub
     strh r1, [r0]
 retail_park:
-    b retail_park
+    // Test 105: observe the unmodified real ARM7 loader's startup signal.
+    ldr r0, retailIpcSync
+    ldrh r3, [r0]
+    movs r1, #15
+    ands r3, r1
+    cmp r3, #10
+    bne retail_park
+    ldr r0, retailBrightMain
+    ldr r1, retailWhiteValue
+    strh r1, [r0]
+    ldr r0, retailBrightSub
+    strh r1, [r0]
+retail_loader_started:
+    b retail_loader_started // intentionally withhold loader handshake reply
 retail_return:
     pop {r0}
     pop {r1,r2,r3,r4,r6,pc}
@@ -135,6 +150,8 @@ retailBrightSub:
     .word 0x0400106C
 retailBlackValue:
     .word 0x00008010
+retailWhiteValue:
+    .word 0x00004010
 retailVramC:
     .word 0x04000242
 retailExmemCnt:

@@ -264,4 +264,25 @@ Pass: blackout then mute supports complete retained payload and ARM7 instruction
 fetch/execution from this mapped bank. This diagnostic does not execute the real
 loader or establish its startup dependencies (boot drive, paths, peer, hardware
 state). Failure may sustain sound; power-cycle after test.
-Hardware pending. Deliver DSPico_Test_104.zip; copy only two loader bins.
+Hardware PASS October 5: black screen and mute almost simultaneously on race
+load, supporting full-copy/checksum plus VRAM ARM token execution and return.
+Deliver DSPico_Test_104.zip; copy only two loader bins.
+
+## Test 105: enter real ARM7 loader and observe its startup handshake
+
+Keep complete staged image, checksum and VRAM token check. Map VRAM D to ARM7
+at +128KiB (0x8A) together with C (0x82), matching loader7.ld's 256KiB region.
+After verification, replace diagnostic mute with BX to the entry pointer from
+the staged header. Unmodified crt0 disables IRQs, clears BSS, sets stack to
+0x0380FD80 and enters loaderMain. That code initializes constructors, clears
+sound, initializes RTOS, then initIpc publishes HANDSHAKE_PART0=A and waits for
+ARM9 A. ARM9 remains parked but polls incoming A; only then sets both master
+brightness registers to white (0x4010) and parks permanently WITHOUT replying A.
+This deliberately stops at startup before SD mounting/path selection, with no
+ARM9 loader payload present. No changes to compiled ARM7 loader binary.
+Expected: black, sound stops due to actual loader, then both screens white.
+Black+mute alone means real-loader sound clearing may have occurred, not complete
+startup handshake. White means ARM7 reached initIpc PART0, not completed boot.
+Power-cycle afterward. Hardware pending. Deliver DSPico_Test_105.zip.
+Copy only two loader bins. Next requirement: stage/start matching ARM9 loader,
+then propagate boot-drive and launcher-path parameters for the intended return.

@@ -60,10 +60,12 @@ staging_verify:
     bl execute_vram_token
     cmp r0, #0x5B
     bne detection_done
-    ldr r2, regSoundCnt
-    movs r3, #0
-    strh r3, [r2]
-    b detection_done
+    // Test 105: enter actual ARM7 loader, never return to game callback.
+    // Loader crt0 disables IRQs, clears BSS and establishes its own stack.
+    // Real loaderMain clears sound and emits startup IPCSYNC A.
+    ldr r2, stagingBase
+    ldr r0, [r2] // pload_header7_t.entryPoint (ARM address)
+    bx r0
 
 check_hotkey:
     ldr r2, regKeyInput
