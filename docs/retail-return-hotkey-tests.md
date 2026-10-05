@@ -328,4 +328,25 @@ ROM. This is an actual return attempt, not a guaranteed return. Compatibility
 outside the tested SDK2-4 CPU read path remains unproven. SD waits remain existing
 unbounded implementation. Expected: black/silence then Pico Loader menu; record
 any displayed error or black/white hang. Power-cycle if stuck.
-Hardware pending. Deliver DSPico_Test_107.zip; copy only two loader bins.
+Hardware PARTIAL October 5: Pico Loader interface appears but game list empty.
+Photo shows launcher shell with back/settings icons; user confirms no controls
+respond. This is a launcher hang, not proven directory enumeration failure.
+Deliver DSPico_Test_107.zip; copy only two loader bins.
+
+## Test 108: leave ARM7 IRQ context before loader entry
+
+Keep Test 107 images, reads, parameters, ARM9 startup and normal return target.
+Replace direct ARM7 BX entry with a small ARM trampoline in the injected patch:
+disable IME, establish IRQ stack 0x0380FF80 and SVC stack 0x0380FFC0 with CPU
+interrupts masked, switch CPSR to ARM system mode 0x1F, then BX actual loader
+entry. Loader crt0 establishes system SP 0x0380FD80 as before. Hardware IME is
+off when CPU mask is lifted; loader runtime owns subsequent IRQ setup.
+Reason: hotkey path originates inside ARM7 VBlank IRQ; ARM7 crt0 never changes
+CPU mode, unlike ARM9 crt0. RTOS startMainThread does not switch mode either.
+Inherited IRQ-mode stack/control state can survive polling-based loader startup
+and corrupt later scheduling/interrupt-dependent launcher operation. This is a
+source-backed hypothesis; user hardware result will determine sufficiency.
+No changes to on-disk ARM7 loader binary or its expected checksum.
+Expected: return to responsive Pico Loader with games; record empty/frozen shell,
+visible error or boot regression. Power-cycle if stuck.
+Hardware pending. Deliver DSPico_Test_108.zip; copy only two loader bins.

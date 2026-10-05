@@ -68,7 +68,32 @@ staging_verify:
     beq detection_done
     ldr r2, stagingBase
     ldr r0, [r2] // pload_header7_t.entryPoint (ARM address)
+    adr r2, arm7_loader_takeover
+    bx r2
+
+.balign 4
+.arm
+arm7_loader_takeover:
+    // Test 108: abandon the game's IRQ context before real loader startup.
+    // r0 remains the actual loader entry; IME off before CPU IRQ enable.
+    ldr r1, takeoverIme
+    mov r2, #0
+    str r2, [r1]
+    msr cpsr_c, #0xD2 // ARM IRQ mode, IRQ/FIQ masked
+    ldr sp, takeoverIrqStack
+    msr cpsr_c, #0xD3 // ARM supervisor mode, IRQ/FIQ masked
+    ldr sp, takeoverSvcStack
+    msr cpsr_c, #0x1F // ARM system mode; crt0 establishes system stack
     bx r0
+.balign 4
+takeoverIme:
+    .word 0x04000208
+takeoverIrqStack:
+    .word 0x0380FF80
+takeoverSvcStack:
+    .word 0x0380FFC0
+
+.thumb
 
 check_hotkey:
     ldr r2, regKeyInput
