@@ -82,6 +82,17 @@ retail_clear_ack:
     ldr r1, retailOutputMask
     bics r3, r1
 retail_write_ack:
+    // Test 101: give VRAM C to ARM7 before publishing acknowledgement.
+    movs r1, #15
+    ands r1, r3
+    cmp r1, #14
+    bne retail_publish_ack
+    push {r0,r3}
+    ldr r0, retailVramC
+    movs r1, #0x82
+    strb r1, [r0]
+    pop {r0,r3}
+retail_publish_ack:
     strh r3, [r0]
     movs r1, #15
     ands r1, r3
@@ -118,6 +129,8 @@ retailBrightSub:
     .word 0x0400106C
 retailBlackValue:
     .word 0x00008010
+retailVramC:
+    .word 0x04000242
 
 .global __patch_cardireadcard_fix_cp15_asm_address
 __patch_cardireadcard_fix_cp15_asm_address:

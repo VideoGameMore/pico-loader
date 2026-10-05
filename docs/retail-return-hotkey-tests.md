@@ -183,7 +183,9 @@ loader placement, actual reset, or ARM7 parking yet. This intentionally stops
 gameplay; user must power-cycle after test. Expected: normal boot until hotkey
 and next CPU cartridge read, then both screens black and gameplay halts; mute
 if ARM7 detector continues. Black marker occurs after IME disable. Frozen visible
-frame alone is not the expected marker. Hardware pending.
+frame alone is not the expected marker. Hardware PASS October 5: both screens
+turn black and gameplay stops deliberately, as requested. Audio not explicitly
+reported in that result.
 Deliver DSPico_Test_100.zip; copy only two loader bins.
 
 ### Recap 90-99
@@ -199,3 +201,18 @@ Deliver DSPico_Test_100.zip; copy only two loader bins.
 Next: park ARM9, choose safe complete-loader placement, stop/redirect ARM7,
 perform required hardware/cache setup, then start both loaders. None of the
 passing diagnostics establishes actual return-to-loader yet.
+
+## Test 101: retain complete ARM7 loader in ARM7-mapped VRAM C
+
+ARM9 maps VRAM C to ARM7 offset zero (VRAMCNT_C=0x82) BEFORE publishing D,
+then follows proven Test 100 black-screen/IME-off park. ARM7 accepts D,
+initializes stagingCursor=0x06000000 and runs a second complete-file transfer.
+The existing word loop stores each of 12112 words into that 128 KiB bank;
+initial pre-request pass has cursor=0 and does not write VRAM. Restore r4
+physical-sector state per word. On transfer checksum success, a separate sweep
+reads all 48448 stored bytes and checks additive sum 0x355637BE. Only then mute.
+No loader execution, entry jump, BSS clearing, VRAM D mapping, or ARM7 park yet.
+Black screens now mean ARM9 parked; audio mute additionally supports full retained
+ARM7 payload/readback success. Audio continuing can indicate second-read/staging
+failure or ARM7 callback unavailable after park. Power-cycle after test.
+Hardware pending. Deliver DSPico_Test_101.zip; copy only two loader bins.

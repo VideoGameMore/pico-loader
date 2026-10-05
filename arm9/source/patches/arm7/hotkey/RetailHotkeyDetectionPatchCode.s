@@ -32,8 +32,34 @@ patch_retailhotkeydetect_entry:
     adr r2, ackPending
     movs r3, #0
     str r3, [r2]
+    // Test 101: acknowledged ARM9 has mapped VRAM C and parked.
+    adr r2, stagingCursor
+    ldr r3, stagingBase
+    str r3, [r2]
+    bl patch_retailhotkeydetect_dspico_loader_probe
+    adr r2, stagingCursor
+    movs r3, #0
+    str r3, [r2]
+    cmp r0, #0
+    beq detection_done
+
+    // Verify the complete retained payload after all sector writes.
+    ldr r2, stagingBase
+    ldr r3, loaderWordCount
+    movs r4, #0
+staging_verify:
+    ldr r5, [r2]
+    adds r4, r4, r5
+    adds r2, #4
+    subs r3, #1
+    bne staging_verify
+    ldr r2, expectedLoaderSum
+    cmp r4, r2
+    bne detection_done
     ldr r2, regSoundCnt
+    movs r3, #0
     strh r3, [r2]
+    b detection_done
 
 check_hotkey:
     ldr r2, regKeyInput
@@ -111,6 +137,7 @@ firedFlag:
 ackPending:
     .word 0
 
+
 .thumb
 .type patch_retailhotkeydetect_dspico_loader_probe, %function
 patch_retailhotkeydetect_dspico_loader_probe:
@@ -137,6 +164,17 @@ full_next_sector:
     movs r2, r7              // final sector: ignore bytes beyond file EOF
 full_sum_words:
     ldr r0, [r1]
+    // Only the post-ack pass retains words in VRAM C.
+    push {r4}
+    adr r4, stagingCursor
+    ldr r3, [r4]
+    cmp r3, #0
+    beq full_no_stage
+    str r0, [r3]
+    adds r3, #4
+    str r3, [r4]
+full_no_stage:
+    pop {r4}
     adds r6, r6, r0
     adds r1, #4
     subs r7, #1
@@ -163,6 +201,12 @@ full_read_failed:
 full_failed:
     movs r0, #0
     pop {r6, r7, pc}
+
+.balign 4
+stagingCursor:
+    .word 0
+stagingBase:
+    .word 0x06000000
 
 // Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
 // Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
