@@ -168,5 +168,34 @@ Keep gameplay running; after hotkey trigger cartridge reads by loading a race.
 Mute is now evidence of full-file read plus ARM9 request/reply, subject to
 possible collision with game-owned IPCSYNC nibble use. No mute does not negate
 the earlier full-file success. A delayed reply can mute after keys are released.
-Hardware pending. Deliver DSPico_Test_99.zip; replace only two loader bins.
+Hardware PASS October 5: audio stayed on until race loaded, then muted.
+This supports ARM9 receiving E and replying D before ARM7 mute.
+Deliver DSPico_Test_99.zip; replace only two loader bins.
 Recap near Test 100. Payload placement and actual reset still remain.
+
+## Test 100: controlled ARM9 parking after acknowledged request
+
+Preserve Test 99 request/reply. After publishing D, ARM9 checks request E,
+disables its IME, writes 0x8010 to both master brightness registers, and loops
+locally in the patch. Non-request reads still return normally. ARM7 unchanged:
+it should see D and mute on a subsequent detector invocation. No VRAM remap,
+loader placement, actual reset, or ARM7 parking yet. This intentionally stops
+gameplay; user must power-cycle after test. Expected: normal boot until hotkey
+and next CPU cartridge read, then both screens black and gameplay halts; mute
+if ARM7 detector continues. Black marker occurs after IME disable. Frozen visible
+frame alone is not the expected marker. Hardware pending.
+Deliver DSPico_Test_100.zip; copy only two loader bins.
+
+### Recap 90-99
+
+90/91: staged Thumb and ARM instructions execute and return.
+92: actual ARM7 entry sector reads correctly through file extents.
+93/94: full-file transfers fail before checksum gate; no mute.
+95: larger E4 poll budget restores full transfer completion.
+96: full-file additive checksum gate passes, no freeze.
+97: mute only; ARM9 brightness marker not observed.
+98: reported flicker, game continues; marker overwrite plausible.
+99: mute only after race load, supporting ARM9 request/reply.
+Next: park ARM9, choose safe complete-loader placement, stop/redirect ARM7,
+perform required hardware/cache setup, then start both loaders. None of the
+passing diagnostics establishes actual return-to-loader yet.

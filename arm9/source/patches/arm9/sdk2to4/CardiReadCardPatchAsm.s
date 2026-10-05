@@ -64,7 +64,7 @@ do_read:
     blx r3
 
 ignore_read:
-    // Test 99: acknowledge ARM7 request through hardware IPCSYNC.
+    // Test 100: acknowledge ARM7, then deliberately park ARM9.
     // Preserve r0 result; r1/r3 restored by the original epilogue.
     push {r0}
     ldr r0, retailIpcSync
@@ -83,6 +83,23 @@ retail_clear_ack:
     bics r3, r1
 retail_write_ack:
     strh r3, [r0]
+    movs r1, #15
+    ands r1, r3
+    cmp r1, #14
+    bne retail_return
+    // Deliberate takeover marker: stop ARM9 IRQs and game execution.
+    // ARM7 continues independently and can observe the D acknowledgement.
+    ldr r0, retailIme
+    movs r1, #0
+    str r1, [r0]
+    ldr r0, retailBrightMain
+    ldr r1, retailBlackValue
+    strh r1, [r0]
+    ldr r0, retailBrightSub
+    strh r1, [r0]
+retail_park:
+    b retail_park
+retail_return:
     pop {r0}
     pop {r1,r2,r3,r4,r6,pc}
 
@@ -93,6 +110,14 @@ retailOutputMask:
     .word 0x00000F00
 retailAckValue:
     .word 0x00000D00
+retailIme:
+    .word 0x04000208
+retailBrightMain:
+    .word 0x0400006C
+retailBrightSub:
+    .word 0x0400106C
+retailBlackValue:
+    .word 0x00008010
 
 .global __patch_cardireadcard_fix_cp15_asm_address
 __patch_cardireadcard_fix_cp15_asm_address:
