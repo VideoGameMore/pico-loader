@@ -40,8 +40,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 95: full read with a larger bounded SD status-poll budget.
-    // Checksum gate stays disabled; mute only after all 95 sectors return.
+    // Test 96: keep Test 95's larger bounded status budget.
+    // Mute only after the complete file's additive checksum also matches.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -119,7 +119,7 @@ full_sum_words:
 full_check_sum:
     ldr r0, expectedLoaderSum
     cmp r6, r0
-    nop                     // Test 94: do not reject checksum mismatch
+    bne full_failed         // Test 96: require full-file sum match again
     movs r0, #1
     pop {r6, r7, pc}
 

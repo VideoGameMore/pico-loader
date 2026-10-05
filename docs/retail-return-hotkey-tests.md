@@ -104,4 +104,17 @@ allowing 131071 E4 polls per sector. Bus waits remain bounded. Full read, extent
 map, checksum calculation and disabled checksum gate remain as Test 94.
 Mute/no-freeze means complete transfer processing; not checksum validation.
 No mute rejects the small-poll-budget hypothesis as a sufficient fix.
-Hardware pending. Deliver DSPico_Test_95.zip. Copy only the two loader bins.
+Hardware result: user reports pass, boots then mutes, October 5.
+Post-mute continued gameplay/no-freeze was not explicitly reported.
+The larger poll budget permits full transfer completion on this setup.
+Deliver DSPico_Test_95.zip. Copy only the two loader bins.
+
+## Test 96: full-file checksum with proven larger status budget
+
+Restore ONLY the checksum-mismatch branch disabled in Test 94. Preserve Test 95's
+0x20000 status budget, 95-sector extent read and 512-byte buffer. Mute now requires
+the 12112-word additive sum to equal 0x355637BE. This closes the data-validation
+step after Test 95 reached full-transfer completion. Checksum is diagnostic,
+not collision-free identity proof. Hardware pending. Deliver DSPico_Test_96.zip.
+Expected pass: boots, hotkey mutes, gameplay continues without freezing.
+Copy only the two loader bins; next recap near Test 100.
