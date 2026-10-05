@@ -131,13 +131,14 @@ retail_park:
 retail_load_failed:
     b retail_load_failed
 retail_arm9_staged:
+    // Test 107: restore visible output and enter matching ARM9 loader.
     ldr r0, retailBrightMain
-    ldr r1, retailWhiteValue
+    movs r1, #0
     strh r1, [r0]
     ldr r0, retailBrightSub
     strh r1, [r0]
-retail_loader_started:
-    b retail_loader_started // intentionally withhold loader handshake reply
+    ldr r0, retailArm9Base
+    bx r0
 retail_return:
     pop {r0}
     pop {r1,r2,r3,r4,r6,pc}
@@ -232,6 +233,10 @@ retailArm9Base:
     .word 0x06800000
 retailArm9EntryWords:
     .word 0xE59F011C, 0xE5C00000, 0xE59F0118, 0xEE010F10
+.global patch_cardireadcard_loaderParams
+patch_cardireadcard_loaderParams:
+    .space 260 // u32 boot drive, 256-byte launcher path
+
 .global patch_cardireadcard_loader9Extents
 patch_cardireadcard_loader9Extents:
     .space 40

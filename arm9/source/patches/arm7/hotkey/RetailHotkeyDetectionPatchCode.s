@@ -63,6 +63,9 @@ staging_verify:
     // Test 105: enter actual ARM7 loader, never return to game callback.
     // Loader crt0 disables IRQs, clears BSS and establishes its own stack.
     // Real loaderMain clears sound and emits startup IPCSYNC A.
+    bl setup_launcher_header
+    cmp r0, #0
+    beq detection_done
     ldr r2, stagingBase
     ldr r0, [r2] // pload_header7_t.entryPoint (ARM address)
     bx r0
@@ -213,6 +216,50 @@ stagingCursor:
     .word 0
 stagingBase:
     .word 0x06000000
+
+
+.thumb
+.type setup_launcher_header, %function
+setup_launcher_header:
+    ldr r2, patch_retailhotkeydetect_loaderParamsAddress
+    cmp r2, #0
+    beq launcher_params_bad
+    ldr r0, launcherHeaderBase
+    ldr r3, [r2]
+    strh r3, [r0, #8] // boot drive; apiVersion at +10 stays intact
+    adds r2, #4
+    ldrb r3, [r2]
+    cmp r3, #0
+    beq launcher_params_bad
+    ldr r4, launcherRomPath
+    ldr r5, launcherReturnPath
+    movs r1, #64
+launcher_copy_path:
+    ldr r3, [r2]
+    str r3, [r4]
+    str r3, [r5]
+    adds r2, #4
+    adds r4, #4
+    adds r5, #4
+    subs r1, #1
+    bne launcher_copy_path
+    // Fresh checksum-verified disk header already has null DLDI, save,
+    // argv and cheats fields. Missing DLDI uses loader's platform SD code.
+    movs r0, #1
+    bx lr
+launcher_params_bad:
+    movs r0, #0
+    bx lr
+.balign 4
+.global patch_retailhotkeydetect_loaderParamsAddress
+patch_retailhotkeydetect_loaderParamsAddress:
+    .word 0
+launcherHeaderBase:
+    .word 0x06000000
+launcherRomPath:
+    .word 0x0600000C
+launcherReturnPath:
+    .word 0x06000310
 
 .thumb
 .type execute_vram_token, %function

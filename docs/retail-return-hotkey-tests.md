@@ -304,5 +304,28 @@ full-file checksum validation. SD reader retains its existing unbounded waits.
 ARM7 remains waiting; ARM9 does not enter its loader yet. Expected black, sound
 stops, white. White now requires ARM7 startup AND ARM9 image staging/checks.
 Black+silence leaves card transfer/map/header check unresolved. Power-cycle.
-Hardware pending. Deliver DSPico_Test_106.zip; copy only two loader bins.
+Hardware PASS October 5: black -> audio stops -> white.
+Supports real ARM7 startup plus ARM9 staging/entry checks.
+Deliver DSPico_Test_106.zip; copy only two loader bins.
 Next: loader startup on ARM9 and correct boot-drive/launcher parameters.
+
+## Test 107: first coordinated loader startup and return attempt
+
+Keep proven image transfer and ARM7 actual startup. Preserve boot drive with
+multiboot flag cleared plus 256-byte launcher path in ARM9 patch data, populated
+before game patching. CARDi ApplyPatch publishes its relocated data address into
+the ARM7 template; ARM9 patching completes before ARM7 template copy. ARM7 reads
+that immutable data before entering its loader, sets header bootDrive and both
+romPath/launcherPath. Missing pointer or empty path rejects entry. Original raw
+header null DLDI, empty save/argv and null cheats remain; null DLDI makes normal
+loader initialize platform SD functions. The verified loader checksum precedes
+parameter edits. No real loader binaries altered by parameter injection.
+Once ARM9 receives ARM7 A and loads/checks its own image, clear master brightness
+and BX 0x06800000 instead of parking white. ARM9 crt0 reinitializes MPU/caches,
+ITCM/DTCM/BSS/stacks and enters normal loaderMain; it should answer ARM7 A and
+complete normal handshake, mount SD and load the preserved launcher as normal
+ROM. This is an actual return attempt, not a guaranteed return. Compatibility
+outside the tested SDK2-4 CPU read path remains unproven. SD waits remain existing
+unbounded implementation. Expected: black/silence then Pico Loader menu; record
+any displayed error or black/white hang. Power-cycle if stuck.
+Hardware pending. Deliver DSPico_Test_107.zip; copy only two loader bins.

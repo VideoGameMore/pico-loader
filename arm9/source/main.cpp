@@ -48,6 +48,7 @@ static u16 sIsCloneBootRom;
 static u16 sRunInDSiMode;
 static loader_info_t sLoaderInfo;
 extern "C" u32 patch_cardireadcard_loader9Extents[10];
+extern "C" u32 patch_cardireadcard_loaderParams[65];
 static void** sSoftResetCheatsPointer = nullptr;
 
 u16 gIsDsiMode;
@@ -179,6 +180,12 @@ static void handleInitializeLoaderInfoCommand()
 {
     dc_invalidateRange(TWL_SHARED_MEMORY->ntrSharedMem.cardRomHeader, sizeof(loader_info_t));
     memcpy(&sLoaderInfo, TWL_SHARED_MEMORY->ntrSharedMem.cardRomHeader, sizeof(loader_info_t));
+
+    // Test 107: preserve return target in the relocated ARM9 read patch.
+    patch_retailhotkeydetect_loaderParamsAddress = 0;
+    patch_cardireadcard_loaderParams[0] = sLoaderInfo.picoLoaderBootDrive & 0x7FFF;
+    memcpy(&patch_cardireadcard_loaderParams[1], sLoaderInfo.launcherPath, 256);
+    ((char*)&patch_cardireadcard_loaderParams[1])[255] = 0;
 
     // Test 93: bake bounded physical extents for the complete 48448-byte
     // ARM7 loader into the injected patch. No runtime ARM9 mailbox is needed.

@@ -9,6 +9,8 @@
 #include "gameCode.h"
 #include "CardiReadCardPatchAsm.h"
 #include "CardiReadCardPatch.h"
+#include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
+extern "C" u32 patch_cardireadcard_loaderParams[65];
 
 static const u32 sCARDiReadCardPatternUnknown[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90D8u };
 static const u32 sCARDiReadCardPatternSdk20029A7[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90E0u };
@@ -291,6 +293,11 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
         *(u32*)((u8*)_cardiReadCard + patchOffset + 8) = entryAddress;
     }
 
+    // ARM9 patches finish before ARM7 patches are copied into the game.
+    // Publish the relocated immutable parameter address, not the loader template.
+    patch_retailhotkeydetect_loaderParamsAddress =
+        (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
+        (u32)SECTION_START(patch_cardireadcard);
     memcpy(patch1Address, SECTION_START(patch_cardireadcard), patch1Size);
     memcpy(patch4Address, SECTION_START(fixcp15), patch4Size);
 }
