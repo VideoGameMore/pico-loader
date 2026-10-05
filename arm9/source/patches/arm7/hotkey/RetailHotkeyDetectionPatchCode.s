@@ -40,8 +40,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 90: retain Test 89's two-sector validation, then execute a tiny
-    // Thumb diagnostic staged in the same ARM7-owned buffer. Mute only after
+    // Test 91: retain the passing sector checks, then execute a tiny
+    // ARM-mode diagnostic staged in the same ARM7-owned buffer. Mute only after
     // the staged code returns its expected token; no loader reboot yet.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
@@ -117,22 +117,22 @@ patch_retailhotkeydetect_dspico_loader_probe:
     cmp r3, #0
     bne read_failed
 
-    // The sector checks passed. Reuse the buffer for four bytes of executable
-    // Thumb code: movs r0, #0x5A; bx lr. This isolates RAM execution/return
-    // before attempting to place or execute a complete loader payload.
+    // Loader crt0 starts in ARM mode. Stage eight bytes, enter with BX
+    // using a word-aligned address, then BX LR back to the Thumb caller.
     adr r1, loaderSectorBuffer
     adr r3, stagedExecutionTemplate
-    ldr r3, [r3]
-    str r3, [r1]
-    adds r1, #1              // Thumb entry address
+    ldr r5, [r3]
+    str r5, [r1]
+    ldr r5, [r3, #4]
+    str r5, [r1, #4]
     bl execute_staged_probe
-    cmp r0, #0x5A
+    cmp r0, #0x5B
     bne read_failed
 
     movs r0, #1
     pop {pc}
 
-// BL sets the Thumb return address; BX transfers to the staged routine.
+// BL sets the Thumb return address; BX enters the staged routine in ARM mode.
 // The enclosing probe already saved its own incoming LR.
 execute_staged_probe:
     bx r1
@@ -280,8 +280,8 @@ expectedHeaderWord8:
 
 .balign 4
 stagedExecutionTemplate:
-    .hword 0x205A           // movs r0, #0x5A
-    .hword 0x4770           // bx lr
+    .word 0xE3A0005B        // ARM: mov r0, #0x5B
+    .word 0xE12FFF1E        // ARM: bx lr (return to Thumb)
 
 .balign 4
 loaderSectorBuffer:

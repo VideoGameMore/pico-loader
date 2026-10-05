@@ -36,6 +36,16 @@ Use the same game and hold L + R + Down + Select for approximately half a second
 Expected pass: boots, hotkey mutes, gameplay continues without freezing.
 Report boot outcome, mute/no mute, freeze/no freeze.
 
-New code requires CI compilation. Hardware result: pending.
+New code requires CI compilation. Hardware result: PASS reported October 5: staged Thumb execution returns correctly; mute/no-freeze pass.
 Deliver as DSPico_Test_90.zip.
 Recap around every ten tests, next near Test 100; advance after reported failures.
+
+## Test 91: staged ARM execution and Thumb return
+
+Test 90 passed on hardware. Test 91 preserves its sector checks and 512-byte
+buffer, but stages ARM mov r0, #0x5B; bx lr (eight bytes). It enters the aligned
+buffer with BX, checks token 0x5B on return to Thumb, then mutes. This matches the
+instruction mode used by arm7/source/crt0.s, without executing the real loader,
+changing stack, disabling IRQs, or remapping VRAM. Hardware result: pending.
+Expected pass: boots, hotkey mutes, no freeze. Copy only the two loader bins.
+Deliver as DSPico_Test_91.zip. Next recap remains near Test 100.
