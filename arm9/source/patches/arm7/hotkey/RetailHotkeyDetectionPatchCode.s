@@ -40,8 +40,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 94: same full read as Test 93; isolate the checksum gate.
-    // Mute after all 95 sectors return, even if the word sum differs.
+    // Test 95: full read with a larger bounded SD status-poll budget.
+    // Checksum gate stays disabled; mute only after all 95 sectors return.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -169,7 +169,7 @@ read_wait_request_done:
     b read_one_failed
 
 read_begin_status:
-    movs r0, #255           // bound total E4 polls, not only each bus wait
+    ldr r0, probeTimeout    // Test 95: 0x20000 bounded E4 polls per sector
 read_poll_status:
     subs r0, #1
     beq read_one_failed

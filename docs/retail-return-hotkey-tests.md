@@ -92,4 +92,16 @@ status-poll limit and timing remain unchanged. Sum is still computed but not a
 pass requirement. Mute/no-freeze means the full transfer/processing path reached
 completion; it does not validate file identity. No mute means the failure is
 before checksum acceptance (or hotkey execution was not reached).
-Hardware pending. Deliver DSPico_Test_94.zip. Copy only the two loader bins.
+Hardware result: boots, no mute, reported October 5.
+Deliver DSPico_Test_94.zip. Copy only the two loader bins.
+
+## Test 95: increase full-read E4 status-poll budget
+
+Test 94 failed before checksum acceptance. Test 93 introduced a 255 counter
+allowing only 254 E4 polls per sector; the earlier passing probes did not have
+a total poll cap. Change ONLY that budget to existing probeTimeout=0x20000,
+allowing 131071 E4 polls per sector. Bus waits remain bounded. Full read, extent
+map, checksum calculation and disabled checksum gate remain as Test 94.
+Mute/no-freeze means complete transfer processing; not checksum validation.
+No mute rejects the small-poll-budget hypothesis as a sufficient fix.
+Hardware pending. Deliver DSPico_Test_95.zip. Copy only the two loader bins.
