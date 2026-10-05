@@ -40,9 +40,9 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 89: same two-sector/single-buffer probe as Test 88, but preserve
-    // the probe's incoming LR across nested BL calls to read_one_sector.
-    // Test 88 could validate/mute yet corrupt its return path afterward.
+    // Test 90: retain Test 89's two-sector validation, then execute a tiny
+    // Thumb diagnostic staged in the same ARM7-owned buffer. Mute only after
+    // the staged code returns its expected token; no loader reboot yet.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -117,8 +117,25 @@ patch_retailhotkeydetect_dspico_loader_probe:
     cmp r3, #0
     bne read_failed
 
+    // The sector checks passed. Reuse the buffer for four bytes of executable
+    // Thumb code: movs r0, #0x5A; bx lr. This isolates RAM execution/return
+    // before attempting to place or execute a complete loader payload.
+    adr r1, loaderSectorBuffer
+    adr r3, stagedExecutionTemplate
+    ldr r3, [r3]
+    str r3, [r1]
+    adds r1, #1              // Thumb entry address
+    bl execute_staged_probe
+    cmp r0, #0x5A
+    bne read_failed
+
     movs r0, #1
     pop {pc}
+
+// BL sets the Thumb return address; BX transfers to the staged routine.
+// The enclosing probe already saved its own incoming LR.
+execute_staged_probe:
+    bx r1
 
 // Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
 // Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
@@ -260,6 +277,11 @@ expectedHeaderWord0:
     .word 0x06000414
 expectedHeaderWord8:
     .word 0x00030000
+
+.balign 4
+stagedExecutionTemplate:
+    .hword 0x205A           // movs r0, #0x5A
+    .hword 0x4770           // bx lr
 
 .balign 4
 loaderSectorBuffer:
