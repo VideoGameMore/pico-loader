@@ -189,6 +189,31 @@ static void handleInitializeLoaderInfoCommand()
             ((sLoaderInfo.clusterMap7[2] - 2) << sLoaderInfo.clusterShift) + sLoaderInfo.database;
     }
 
+    // Test 92: resolve logical file sector 2 through the CLMT run list.
+    // A file may be fragmented, so first-sector + 2 is not assumed.
+    patch_retailhotkeydetect_loaderEntrySector = 0;
+    if (sLoaderInfo.clusterShift < 32)
+    {
+        u32 clusterOffset = 2u >> sLoaderInfo.clusterShift;
+        const u32 sectorInCluster = 2u & ((1u << sLoaderInfo.clusterShift) - 1u);
+        for (u32 i = 1; i + 1 < 16; i += 2)
+        {
+            const u32 count = sLoaderInfo.clusterMap7[i];
+            const u32 start = sLoaderInfo.clusterMap7[i + 1];
+            if (count == 0 || start < 2)
+                break;
+            if (clusterOffset < count)
+            {
+                const u64 physical = (((u64)start - 2 + clusterOffset)
+                    << sLoaderInfo.clusterShift) + sLoaderInfo.database + sectorInCluster;
+                if (physical <= 0xFFFFFFFFull)
+                    patch_retailhotkeydetect_loaderEntrySector = (u32)physical;
+                break;
+            }
+            clusterOffset -= count;
+        }
+    }
+
     dc_flushAll();
     dc_drainWriteBuffer();
     ipc_sendWordDirect(1);

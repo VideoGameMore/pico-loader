@@ -40,9 +40,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 91: retain the passing sector checks, then execute a tiny
-    // ARM-mode diagnostic staged in the same ARM7-owned buffer. Mute only after
-    // the staged code returns its expected token; no loader reboot yet.
+    // Test 92: validate the header and real ARM7 crt0 entry instructions,
+    // then retain Test 91's staged ARM execution/Thumb return diagnostic.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -101,20 +100,25 @@ patch_retailhotkeydetect_dspico_loader_probe:
     cmp r3, r5
     bne read_failed
 
-    // Advance one physical sector and reuse the same 512-byte buffer.
-    adds r4, #1
+    // Logical file sector 2 contains entry offset 0x414. ARM9 resolved
+    // its physical sector from the cluster map before game launch.
+    ldr r4, patch_retailhotkeydetect_loaderEntrySector
+    cmp r4, #0
+    beq read_failed
     bl read_one_sector
     cmp r0, #0
     beq read_failed
 
-    // In this build sector +1 begins with zeroes. This confirms we advanced
-    // to the next sector without increasing the ARM7 patch staging footprint.
+    // Check actual ARM crt0 instructions at file offsets 0x414/0x418.
+    // These bytes are read from SD, not synthesized by the staged probe.
     adr r1, loaderSectorBuffer
-    ldr r3, [r1]
-    cmp r3, #0
+    ldr r3, [r1, #20]
+    ldr r5, expectedEntryWord0
+    cmp r3, r5
     bne read_failed
-    ldr r3, [r1, #4]
-    cmp r3, #0
+    ldr r3, [r1, #24]
+    ldr r5, expectedEntryWord4
+    cmp r3, r5
     bne read_failed
 
     // Loader crt0 starts in ARM mode. Stage eight bytes, enter with BX
@@ -261,6 +265,13 @@ read_failed:
 .global patch_retailhotkeydetect_loaderSector
 patch_retailhotkeydetect_loaderSector:
     .word 0
+.global patch_retailhotkeydetect_loaderEntrySector
+patch_retailhotkeydetect_loaderEntrySector:
+    .word 0
+expectedEntryWord0:
+    .word 0xE59F0028
+expectedEntryWord4:
+    .word 0xE5C00000
 cardRegBase:
     .word 0x04000198
 cardDataReg:

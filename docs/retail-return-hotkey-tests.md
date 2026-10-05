@@ -46,6 +46,18 @@ Test 90 passed on hardware. Test 91 preserves its sector checks and 512-byte
 buffer, but stages ARM mov r0, #0x5B; bx lr (eight bytes). It enters the aligned
 buffer with BX, checks token 0x5B on return to Thumb, then mutes. This matches the
 instruction mode used by arm7/source/crt0.s, without executing the real loader,
-changing stack, disabling IRQs, or remapping VRAM. Hardware result: pending.
+changing stack, disabling IRQs, or remapping VRAM. Hardware result: PASS reported October 5: boots, mutes, no freeze.
 Expected pass: boots, hotkey mutes, no freeze. Copy only the two loader bins.
 Deliver as DSPico_Test_91.zip. Next recap remains near Test 100.
+
+## Test 92: validate real ARM7 loader entry instructions from SD
+
+Read/check file sector 0 as before, then read logical file sector 2 instead of
+physical sector +1. ARM9 resolves that sector through the CLMT run list before
+launch and embeds it in the patch, accommodating a fragmented file. At buffer
++20/+24 verify ARM instructions 0xE59F0028/0xE5C00000 from file offsets 0x414/0x418.
+These values were inspected in the compiled Test 91 ARM7 binary. The real entry
+code is NOT executed: it disables IRQs and clears BSS, so it requires a complete
+loader and coordinated handoff. Retain Test 91's staged ARM token check.
+Buffer remains 512 bytes. Expected pass: boots/mutes/no freeze. Hardware pending.
+Deliver DSPico_Test_92.zip; replace only picoLoader7.bin and picoLoader9.bin.
