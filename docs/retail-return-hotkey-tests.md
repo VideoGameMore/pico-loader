@@ -115,6 +115,27 @@ Restore ONLY the checksum-mismatch branch disabled in Test 94. Preserve Test 95'
 0x20000 status budget, 95-sector extent read and 512-byte buffer. Mute now requires
 the 12112-word additive sum to equal 0x355637BE. This closes the data-validation
 step after Test 95 reached full-transfer completion. Checksum is diagnostic,
-not collision-free identity proof. Hardware pending. Deliver DSPico_Test_96.zip.
+not collision-free identity proof. Hardware PASS October 5: boots/mutes/no freeze.
+Deliver DSPico_Test_96.zip.
 Expected pass: boots, hotkey mutes, gameplay continues without freezing.
 Copy only the two loader bins; next recap near Test 100.
+
+## Test 97: ARM7 to ARM9 rendezvous via hardware IPC sync
+
+Keep Test 96's complete-file read and checksum. After success ARM7 writes 0xE
+to its IPCSYNC output nibble, preserving other control bits, then mutes. The
+SDK2-4 CARDi CPU-read patch checks its IPCSYNC input nibble at its epilogue,
+after the read inputs and cardi_common state have been consumed. It preserves
+r0; original epilogue restores r1/r2/r3/r4/r6. On request ARM9 writes 0x8008 to
+both master brightness registers, darkening both screens without blacking out.
+This differs from earlier shared-memory bridges by using hardware signalling
+(no ARM9 data-cache visibility dependency) and a post-read insertion point.
+No reset, memory remap, wait for peer, or FIFO/IPC interrupt is introduced.
+This only observes an SDK2-4 CPU cartridge-read path: SDK5/DMA and a game scene
+that does not read through this path may not show the screen marker.
+Test: same game, hold hotkey until muted, then change menu or load/start a race
+to trigger cartridge reads. Mute plus visibly darker screens while gameplay
+continues confirms ARM9 participation. Mute alone confirms ARM7 but not ARM9.
+Boot failure means this bridge integration is not boot-safe on this game.
+Hardware pending. Deliver DSPico_Test_97.zip; copy only the two loader bins.
+Next recap near Test 100. Full reset remains unproven.

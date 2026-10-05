@@ -40,11 +40,20 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 96: keep Test 95's larger bounded status budget.
-    // Mute only after the complete file's additive checksum also matches.
+    // Test 97: keep the proven full-file checksum. Publish a hardware
+    // IPC-sync request after it passes; ARM9 dims screens on its next CPU read.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
+
+    // Preserve IPC control/IRQ bits; change only ARM7's outgoing nibble.
+    ldr r2, regIpcSync
+    ldrh r3, [r2]
+    ldr r4, ipcOutputMask
+    bics r3, r4
+    ldr r4, ipcReturnRequest
+    orrs r3, r4
+    strh r3, [r2]
 
     ldr r2, regSoundCnt
     movs r3, #0
@@ -68,6 +77,12 @@ regKeyInput:
     .word 0x04000130
 regSoundCnt:
     .word 0x04000500
+regIpcSync:
+    .word 0x04000180
+ipcOutputMask:
+    .word 0x00000F00
+ipcReturnRequest:
+    .word 0x00000E00
 hotkeyMask:
     .word 0x00000384
 
