@@ -283,6 +283,26 @@ ARM9 loader payload present. No changes to compiled ARM7 loader binary.
 Expected: black, sound stops due to actual loader, then both screens white.
 Black+mute alone means real-loader sound clearing may have occurred, not complete
 startup handshake. White means ARM7 reached initIpc PART0, not completed boot.
-Power-cycle afterward. Hardware pending. Deliver DSPico_Test_105.zip.
+Hardware PASS October 5: black screens -> audio stops -> both screens white.
+Confirms real ARM7 loader reached startup PART0 A. Power-cycle afterward.
+Deliver DSPico_Test_105.zip.
 Copy only two loader bins. Next requirement: stage/start matching ARM9 loader,
 then propagate boot-drive and launcher-path parameters for the intended return.
+
+## Test 106: stage matching ARM9 loader while real ARM7 waits
+
+Keep Test 105 real ARM7 loader startup; ARM7 waits on A. When ARM9 receives A,
+assign Slot-1 back to ARM9, map VRAM A LCDC, and read the ARM9 loader's physical
+file extents through the existing DSPICO SD reader. Before game boot publish up
+to four runs from clusterMap9; include all allocated sectors (cluster padding),
+bounded to 256 sectors/128 KiB and physical-address overflow checks. No fixed
+ARM9 binary size or self-referential embedded checksum. Empty/invalid/too-large
+map disables completion. After all reads return, compare the first four ARM9
+crt0 instructions to 0xE59F011C,E5C00000,E59F0118,EE010F10. Only then white.
+This is complete allocated-sector transfer plus entry-word checking, NOT a
+full-file checksum validation. SD reader retains its existing unbounded waits.
+ARM7 remains waiting; ARM9 does not enter its loader yet. Expected black, sound
+stops, white. White now requires ARM7 startup AND ARM9 image staging/checks.
+Black+silence leaves card transfer/map/header check unresolved. Power-cycle.
+Hardware pending. Deliver DSPico_Test_106.zip; copy only two loader bins.
+Next: loader startup on ARM9 and correct boot-drive/launcher parameters.

@@ -47,6 +47,7 @@ static u32 sRomDirSectorOffset;
 static u16 sIsCloneBootRom;
 static u16 sRunInDSiMode;
 static loader_info_t sLoaderInfo;
+extern "C" u32 patch_cardireadcard_loader9Extents[10];
 static void** sSoftResetCheatsPointer = nullptr;
 
 u16 gIsDsiMode;
@@ -204,6 +205,39 @@ static void handleInitializeLoaderInfoCommand()
     }
     if (remainingSectors != 0)
         memset(patch_retailhotkeydetect_loaderExtents, 0, 64);
+
+    // Test 106: retain all allocated ARM9-loader sectors, bounded to VRAM A.
+    // Read whole clusters so the evolving ARM9 binary needs no fixed size.
+    memset(patch_cardireadcard_loader9Extents, 0, 40);
+    u32 loader9Sectors = 0;
+    u32 loader9Output = 0;
+    bool loader9MapValid = sLoaderInfo.clusterShift < 32;
+    if (loader9MapValid)
+    {
+        for (u32 i = 1; i + 1 < 10; i += 2)
+        {
+            const u32 count = sLoaderInfo.clusterMap9[i];
+            if (count == 0)
+                break;
+            const u32 start = sLoaderInfo.clusterMap9[i + 1];
+            const u64 sectors = (u64)count << sLoaderInfo.clusterShift;
+            const u64 physical = start >= 2
+                ? ((u64)(start - 2) << sLoaderInfo.clusterShift) + sLoaderInfo.database : 0;
+            if (sectors == 0 || sectors > 256 - loader9Sectors ||
+                physical == 0 || physical + sectors - 1 > 0xFFFFFFFFull)
+            {
+                loader9MapValid = false;
+                break;
+            }
+            patch_cardireadcard_loader9Extents[loader9Output++] = (u32)sectors;
+            patch_cardireadcard_loader9Extents[loader9Output++] = (u32)physical;
+            loader9Sectors += (u32)sectors;
+        }
+        if (sLoaderInfo.clusterMap9[9] != 0)
+            loader9MapValid = false;
+    }
+    if (!loader9MapValid || loader9Sectors == 0)
+        memset(patch_cardireadcard_loader9Extents, 0, 40);
 
     dc_flushAll();
     dc_drainWriteBuffer();
