@@ -248,4 +248,20 @@ this is a timing/ownership hypothesis, not established root cause.
 Pass: blackout followed by mute, supporting full 48448-byte retained payload
 with expected readback additive checksum. Failure: no mute/sustained note.
 No actual loader execution yet. Power-cycle afterward.
-Hardware pending. Deliver DSPico_Test_103.zip; copy only two loader bins.
+Hardware October 5: user says acted just like last test, nearly same timing.
+Interpreted as Test 102-style blackout plus silence; sustained note not reported.
+On that reading the full copy/readback succeeded; interpretation stated to user.
+Deliver DSPico_Test_103.zip; copy only two loader bins.
+
+## Test 104: ARM7 execution from mapped VRAM C after full staging
+
+Keep Test 103 transfer, readback checksum, ownership and ARM9 park. After payload
+verification, write two ARM instructions to unused VRAM C at 0x06010000,
+outside 48448-byte payload: mov r0,#0x5B; bx lr. Enter via BX with an aligned
+ARM address and a Thumb return address; helper preserves nested-call LR.
+Only mute if returned r0 is 0x5B. The full loader bytes remain untouched.
+Pass: blackout then mute supports complete retained payload and ARM7 instruction
+fetch/execution from this mapped bank. This diagnostic does not execute the real
+loader or establish its startup dependencies (boot drive, paths, peer, hardware
+state). Failure may sustain sound; power-cycle after test.
+Hardware pending. Deliver DSPico_Test_104.zip; copy only two loader bins.

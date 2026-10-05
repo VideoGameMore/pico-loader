@@ -56,6 +56,10 @@ staging_verify:
     ldr r2, expectedLoaderSum
     cmp r4, r2
     bne detection_done
+    // Test 104: execute ARM instructions in unused VRAM C and return.
+    bl execute_vram_token
+    cmp r0, #0x5B
+    bne detection_done
     ldr r2, regSoundCnt
     movs r3, #0
     strh r3, [r2]
@@ -207,6 +211,30 @@ stagingCursor:
     .word 0
 stagingBase:
     .word 0x06000000
+
+.thumb
+.type execute_vram_token, %function
+execute_vram_token:
+    push {lr}
+    ldr r2, vramTokenAddress
+    ldr r3, vramTokenMov
+    str r3, [r2]
+    ldr r3, vramTokenBx
+    str r3, [r2, #4]
+    adr r3, vram_token_return
+    adds r3, #1
+    mov lr, r3
+    bx r2
+.balign 4
+vram_token_return:
+    pop {pc}
+.balign 4
+vramTokenAddress:
+    .word 0x06010000
+vramTokenMov:
+    .word 0xE3A0005B // ARM mov r0, #0x5B
+vramTokenBx:
+    .word 0xE12FFF1E // ARM bx lr; return to Thumb
 
 // Read physical SD sector r4 through DSpico E3/E4/E5 into loaderSectorBuffer.
 // Returns r0=1 on success, r0=0 on timeout/failure. r4 is preserved.
