@@ -40,8 +40,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 93: read the complete ARM7 loader through its SD extent map.
-    // Mute only after all file words match the expected additive checksum.
+    // Test 94: same full read as Test 93; isolate the checksum gate.
+    // Mute after all 95 sectors return, even if the word sum differs.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -119,7 +119,7 @@ full_sum_words:
 full_check_sum:
     ldr r0, expectedLoaderSum
     cmp r6, r0
-    bne full_failed
+    nop                     // Test 94: do not reject checksum mismatch
     movs r0, #1
     pop {r6, r7, pc}
 

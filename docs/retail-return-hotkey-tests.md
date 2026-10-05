@@ -75,9 +75,21 @@ This is a streaming read: the entire payload is not retained simultaneously.
 An additive checksum can collide; it is diagnostic evidence, not cryptographic
 or byte-for-byte identity validation. The binary size/sum must be rechecked after
 CI compilation. These constants must change if the ARM7 binary later changes.
-Hardware result pending. Deliver DSPico_Test_93.zip; replace only two loader bins.
+Hardware result: boots, hotkey does nothing (no mute), reported October 5.
+This does not distinguish map/read failure from checksum mismatch.
+Deliver DSPico_Test_93.zip; replace only two loader bins.
 
 Direction after a pass: choose restart-memory placement and processor handoff.
 Existing OSResetSystemPatch only allocates the reset routine when its game reset
 signature is found. ARM7 file reads alone do not establish ARM9 control.
 Recap near Test 100 remains planned.
+
+## Test 94: isolate complete transfer from checksum acceptance
+
+One-variable follow-up to Test 93: replace the checksum-mismatch branch with a
+same-size Thumb NOP. Extents, exact 12112-word processing, 95-sector read, buffer,
+status-poll limit and timing remain unchanged. Sum is still computed but not a
+pass requirement. Mute/no-freeze means the full transfer/processing path reached
+completion; it does not validate file identity. No mute means the failure is
+before checksum acceptance (or hotkey execution was not reached).
+Hardware pending. Deliver DSPico_Test_94.zip. Copy only the two loader bins.
