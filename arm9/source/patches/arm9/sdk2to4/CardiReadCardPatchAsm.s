@@ -60,8 +60,15 @@ do_read:
     lsrs r3, r1, #24 // if dst address is invalid (close to zero), ignore the read
     beq ignore_read  // this is intended to fix reads to null pointers that would be ignored if done with DMA
 
+    // IRQ return hook must not interrupt an in-progress patched SD read.
+    adr r3, retailReadActive
+    movs r4, #1
+    str r4, [r3]
     ldr r3, __patch_cardireadcard_sdread_asm_address
     blx r3
+    ldr r3, retailReadActiveAddress
+    movs r4, #0
+    str r4, [r3]
 
 ignore_read:
     // Test 100: acknowledge ARM7, then deliberately park ARM9.
@@ -144,6 +151,8 @@ retail_return:
     pop {r1,r2,r3,r4,r6,pc}
 
 .balign 4
+retailReadActive:
+    .word 0
 retailIpcSync:
     .word 0x04000180
 retailOutputMask:
@@ -253,6 +262,79 @@ __patch_cardireadcard_rom_offset_to_sd_sector_asm_address:
 .global __patch_cardireadcard_sdread_asm_address
 __patch_cardireadcard_sdread_asm_address:
     .word 0
+
+.balign 4
+.arm
+.global patch_cardireadcard_irq_entry
+.type patch_cardireadcard_irq_entry, %function
+patch_cardireadcard_irq_entry:
+    // Intercept the SDK IRQ dispatch tail. r0 is the selected IRQ index.
+    // Normal dispatch preserves all incoming registers and condition flags.
+    stmdb sp!, {r0-r3,r12,lr}
+    mrs r2, cpsr
+    stmdb sp!, {r2,r3}
+    cmp r0, #0 // VBlank only; never steal a card/DMA interrupt
+    bne retail_irq_continue
+    ldr r1, retail_irq_ipc
+    ldrh r2, [r1]
+    and r2, r2, #15
+    cmp r2, #14
+    bne retail_irq_continue
+    // A nested VBlank must defer until the patched read has fully returned.
+    adr r1, retail_irq_active_offset
+    ldr r2, [r1]
+    add r1, r1, r2
+    ldr r2, [r1]
+    cmp r2, #0
+    bne retail_irq_continue
+    ldr r1, retail_irq_romctrl
+    ldr r2, [r1]
+    tst r2, #0x80000000
+    bne retail_irq_continue
+    // This path never resumes the game. Leave the IRQ bank before SD calls.
+    ldr r1, retail_irq_ime
+    mov r2, #0
+    str r2, [r1]
+    msr cpsr_c, #0xDF // ARM system mode, CPU interrupts masked
+    adr r3, retail_irq_takeover + 1
+    bx r3
+retail_irq_continue:
+    ldmia sp!, {r2,r3}
+    msr cpsr_f, r2
+    ldmia sp!, {r0-r3,r12,lr}
+    // Exact displaced SDK instructions; original table and return literals.
+    ldr r1, patch_cardireadcard_irq_table
+    ldr r0, [r1, r0, lsl #2]
+    ldr lr, patch_cardireadcard_irq_return
+    bx r0
+retail_irq_ipc:
+    .word 0x04000180
+retail_irq_romctrl:
+    .word 0x040001A4
+retail_irq_ime:
+    .word 0x04000208
+retail_irq_active_offset:
+    .word retailReadActive - retail_irq_active_offset
+.global patch_cardireadcard_irq_table
+patch_cardireadcard_irq_table:
+    .word 0
+.global patch_cardireadcard_irq_return
+patch_cardireadcard_irq_return:
+    .word 0
+.thumb
+.type retail_irq_takeover, %function
+retail_irq_takeover:
+    // Reuse the proven acknowledgement/staging/loader sequence.
+    push {r1,r2,r3,r4,r6,lr}
+    ldr r3, retail_irq_fix_offset
+    adr r0, retail_irq_fix_offset
+    adds r3, r3, r0
+    ldr r3, [r3]
+    blx r3
+    b ignore_read
+.balign 4
+retail_irq_fix_offset:
+    .word __patch_cardireadcard_fix_cp15_asm_address - retail_irq_fix_offset
 
 .pool
 

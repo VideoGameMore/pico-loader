@@ -373,7 +373,39 @@ ARM7 loader binary changes due to extra IPC/copy; recompute exact file size,
 word count, sector count and checksum after CI before delivering hardware ZIP.
 Both bins must be replaced together because IPC response schema changes.
 Expected: games visible, layout/back navigation responds, game launches.
-Hardware pending. Deliver DSPico_Test_109.zip; copy only two loader bins.
+Hardware PASS October 5: closed game, returned to usable Pico menu and launched
+the game again. Full cycle confirmed on the tested setup.
+Deliver DSPico_Test_109.zip; copy only two loader bins.
 
 Test 109 compiled ARM7 payload: 48480 bytes, 12120 words, 95 sectors,
 additive checksum 0x0E2D6140. Final CI must match these refreshed constants.
+
+### Recap 100-109
+
+100: ARM9 deliberately parks with black screens.
+101: second ARM7 transfer does not reach mute; sustained note.
+102: VRAM C boundary access passes.
+103: explicit Slot-1 ownership permits full staged copy/readback.
+104: ARM7 executes and returns from VRAM token.
+105: real ARM7 loader reaches its startup handshake.
+106: ARM9 loader image transfer and entry checks pass.
+107: launcher interface appears, but games/navigation unavailable.
+108: fresh ARM7 CPU mode/stacks do not restore storage.
+109: preserved valid DLDI driver restores menu, games and relaunch.
+Remaining delay: ARM9 sees the request only on the next CPU cartridge read.
+
+## Test 110: return from VBlank without a new cartridge read
+
+Keep Test 109's working driver, parameters and loader transfer/startup.
+Find the standard Nitro ARM9 IRQ dispatch tail by its four exact instructions.
+Redirect its pre-autoload bytes to a wrapper; preserve original IRQ table and
+return literals. Normal dispatch restores registers and condition flags then
+executes the four displaced operations. Only VBlank (IRQ index zero) checks the
+ARM7 E request. Defer during a patched SD read or while ROMCTRL is busy.
+On request disable IME and enter masked system mode, apply the existing CP15
+fix and enter the proven card-read epilogue takeover sequence. Existing read
+hook remains a fallback when the standard dispatcher is absent.
+No change to on-disk ARM7 loader or expected 48480-byte checksum.
+Hardware pending. Test from a stationary game menu: hold L+R+Down+Select about
+half a second, without starting a race, expect Pico menu and successful relaunch.
+Deliver DSPico_Test_110.zip; copy only picoLoader7.bin and picoLoader9.bin.

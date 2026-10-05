@@ -11,6 +11,9 @@
 #include "CardiReadCardPatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 extern "C" u32 patch_cardireadcard_loaderParams[65];
+extern "C" void patch_cardireadcard_irq_entry();
+extern "C" u32 patch_cardireadcard_irq_table;
+extern "C" u32 patch_cardireadcard_irq_return;
 
 static const u32 sCARDiReadCardPatternUnknown[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90D8u };
 static const u32 sCARDiReadCardPatternSdk20029A7[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90E0u };
@@ -298,6 +301,28 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     patch_retailhotkeydetect_loaderParamsAddress =
         (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
         (u32)SECTION_START(patch_cardireadcard);
+    // Standard Nitro IRQ dispatch tail, also used when no cartridge read occurs.
+    // Patch the pre-autoload bytes; SDK autoload carries this hook into ITCM.
+    // Leave unknown IRQ implementations on the working card-read fallback.
+    static const u32 irqDispatchPattern[] =
+        { 0xE59F1008, 0xE7910100, 0xE59FE004, 0xE12FFF10 };
+    u32* irqDispatch = patchContext.FindPattern32(irqDispatchPattern, sizeof(irqDispatchPattern));
+    if (irqDispatch && irqDispatch[4] != 0 && irqDispatch[5] != 0)
+    {
+        patch_cardireadcard_irq_table = irqDispatch[4];
+        patch_cardireadcard_irq_return = irqDispatch[5];
+        u32 irqEntry = (u32)patch1Address + (u32)patch_cardireadcard_irq_entry -
+            (u32)SECTION_START(patch_cardireadcard);
+        irqDispatch[0] = 0xE59F1000; // ldr r1, [pc] -> inline relocated address
+        irqDispatch[1] = 0xE12FFF11; // bx r1
+        irqDispatch[2] = irqEntry;
+        irqDispatch[3] = 0xE1A00000; // nop
+        LOG_DEBUG("Retail return VBlank dispatch hook at %p\\n", irqDispatch);
+    }
+    else
+    {
+        LOG_DEBUG("Retail return: IRQ dispatch not found; card-read fallback\\n");
+    }
     memcpy(patch1Address, SECTION_START(patch_cardireadcard), patch1Size);
     memcpy(patch4Address, SECTION_START(fixcp15), patch4Size);
 }
