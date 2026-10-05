@@ -17,6 +17,24 @@ patch_retailhotkeydetect_entry:
     mov lr, r1
     push {r2-r5, lr}
 
+    // Test 99: nonblocking acknowledgement check on each invocation.
+    // A pending successful read is required before accepting ARM9's reply.
+    adr r2, ackPending
+    ldr r3, [r2]
+    cmp r3, #0
+    beq check_hotkey
+    ldr r2, regIpcSync
+    ldrh r3, [r2]
+    movs r4, #15
+    ands r3, r4
+    cmp r3, #13
+    bne check_hotkey
+    adr r2, ackPending
+    movs r3, #0
+    str r3, [r2]
+    ldr r2, regSoundCnt
+    strh r3, [r2]
+
 check_hotkey:
     ldr r2, regKeyInput
     ldrh r3, [r2]
@@ -40,8 +58,8 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 97: keep the proven full-file checksum. Publish a hardware
-    // IPC-sync request after it passes; ARM9 dims screens on its next CPU read.
+    // Test 99: keep full-file checksum; request ARM9 acknowledgement.
+    // Audio stays enabled until ARM9 replies on a later invocation.
     bl patch_retailhotkeydetect_dspico_loader_probe
     cmp r0, #0
     beq detection_done
@@ -55,9 +73,9 @@ check_hotkey:
     orrs r3, r4
     strh r3, [r2]
 
-    ldr r2, regSoundCnt
-    movs r3, #0
-    strh r3, [r2]
+    adr r2, ackPending
+    movs r3, #1
+    str r3, [r2]
     b detection_done
 
 clear_state:
@@ -89,6 +107,8 @@ hotkeyMask:
 holdCounter:
     .word 0
 firedFlag:
+    .word 0
+ackPending:
     .word 0
 
 .thumb

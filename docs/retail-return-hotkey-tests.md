@@ -152,4 +152,21 @@ and after hotkey. Darkening proves this hook executes and its brightness marker
 is observable; it does not prove IPC request delivery. No darkening leaves hook
 reachability versus game brightness overwrite unresolved. Boot failure is failure.
 No reset attempted. Deliver DSPico_Test_98.zip; copy only two loader bins.
-Hardware pending. Recap near Test 100.
+Hardware result October 5: user reports flicker then normal gameplay; video
+shows brief brightness changes. Consistent with marker overwrite, not definitive
+proof that every flicker originated in the patch. Recap near Test 100.
+
+## Test 99: ARM9 acknowledgement gates ARM7 audio mute
+
+Remove brightness writes. ARM9 CPU-read epilogue observes ARM7 IPCSYNC E and
+publishes D in its own output nibble; clears its output nibble when request
+absent. Preserve control bits and saved registers. ARM7 retains checksum probe,
+publishes E and sets local ackPending. It no longer mutes immediately. Every
+subsequent detector invocation checks for D only while ackPending is set; on D
+it clears pending and disables sound. No busy-wait, IRQ/FIFO changes or reset.
+Keep gameplay running; after hotkey trigger cartridge reads by loading a race.
+Mute is now evidence of full-file read plus ARM9 request/reply, subject to
+possible collision with game-owned IPCSYNC nibble use. No mute does not negate
+the earlier full-file success. A delayed reply can mute after keys are released.
+Hardware pending. Deliver DSPico_Test_99.zip; replace only two loader bins.
+Recap near Test 100. Payload placement and actual reset still remain.

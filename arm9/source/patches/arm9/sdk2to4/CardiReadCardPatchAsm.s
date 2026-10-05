@@ -64,35 +64,35 @@ do_read:
     blx r3
 
 ignore_read:
-    // Test 98: unconditional screen marker establishes hook reachability.
-    // Observe the ARM7 request only AFTER the
-    // read inputs and cardi_common calculations have been consumed.
-    // r1/r3 are restored by the original epilogue; preserve returned r0.
+    // Test 99: acknowledge ARM7 request through hardware IPCSYNC.
+    // Preserve r0 result; r1/r3 restored by the original epilogue.
     push {r0}
     ldr r0, retailIpcSync
     ldrh r3, [r0]
     movs r1, #15
-    ands r3, r1
-    cmp r3, #14
-    nop // Test 98: mark every CPU read, independently of IPC request
-    ldr r0, retailBrightMain
-    ldr r1, retailDimValue
-    strh r1, [r0]
-    ldr r0, retailBrightSub
-    strh r1, [r0]
-retail_bridge_done:
+    ands r1, r3
+    cmp r1, #14
+    bne retail_clear_ack
+    ldr r1, retailOutputMask
+    bics r3, r1
+    ldr r1, retailAckValue
+    orrs r3, r1
+    b retail_write_ack
+retail_clear_ack:
+    ldr r1, retailOutputMask
+    bics r3, r1
+retail_write_ack:
+    strh r3, [r0]
     pop {r0}
     pop {r1,r2,r3,r4,r6,pc}
 
 .balign 4
 retailIpcSync:
     .word 0x04000180
-retailBrightMain:
-    .word 0x0400006C
-retailBrightSub:
-    .word 0x0400106C
-retailDimValue:
-    .word 0x00008008        // darken, while keeping gameplay visible
+retailOutputMask:
+    .word 0x00000F00
+retailAckValue:
+    .word 0x00000D00
 
 .global __patch_cardireadcard_fix_cp15_asm_address
 __patch_cardireadcard_fix_cp15_asm_address:
