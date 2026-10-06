@@ -1,4 +1,7 @@
 #include "common.h"
+#include <stdio.h>
+extern u32 retailReturnHeapBeforeTotal;
+extern u32 retailReturnHeapBeforeLargest;
 #include "ModuleParamsLocator.h"
 #include "AutoloadAdjuster.h"
 #include "SdkVersion.h"
@@ -234,6 +237,26 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     if (!patchCollection.TryPerformPatches(patchContext))
     {
         ErrorDisplay().PrintError("Failed to apply arm9 patches.");
+    }
+    if (sdkVersion != 0 && !sdkVersion.IsTwlSdk())
+    {
+        char status[320];
+        snprintf(status, sizeof(status),
+            "TEST 114 - PATCH SPACE\n"
+            "Before CARDi: total %lu\n"
+            "Before largest: %lu\n"
+            "After all: total %lu\n"
+            "After largest: %lu\n"
+            "Working CARDi: 680 bytes\n"
+            "No extra hooks installed.\n"
+            "Photograph this screen.\n"
+            "Press A to boot game.",
+            (unsigned long)retailReturnHeapBeforeTotal,
+            (unsigned long)retailReturnHeapBeforeLargest,
+            (unsigned long)patchContext.GetPatchHeap().GetFreeBytes(),
+            (unsigned long)patchContext.GetPatchHeap().GetLargestFreeBlock());
+        if (!ErrorDisplay().PrintDiagnostic(status))
+            LOG_DEBUG("Test 114 diagnostic display buffer unavailable\n");
     }
     dc_flushAll();
     dc_drainWriteBuffer();

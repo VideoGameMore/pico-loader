@@ -472,4 +472,27 @@ recovery experiment, not a claim that menu-only return is fixed.
 Test: normal game boot, same hotkey, then race load as in Test 109; expect Pico
 menu with games, followed by successful game relaunch. If exact baseline also
 fails boot, investigate installation/setup or state before further source edits.
-Hardware pending. Deliver DSPico_Test_113.zip; replace only the two loader bins.
+Hardware PASS October 5: exits to Pico menu and game reloads again.
+Recovery of the exact Test 109 binary pair is confirmed. Deliver DSPico_Test_113.zip; replace only the two loader bins.
+
+## Test 114: measure patch-space capacity without adding a game hook
+
+113 restores boot and return/relaunch. 110/111/112 all consume additional ARM9
+patch space, while PatchHeap::Alloc spins forever silently if no contiguous
+block fits. This is a concrete failure mechanism and a hypothesis for the
+three white-screen regressions; runtime measurements are needed.
+Add read-only total/largest-block getters and nonfatal TryAlloc; existing Alloc
+retains its required-allocation fatal behavior via TryAlloc. Record capacity
+immediately before the unchanged 680-byte CARDi allocation, then after every
+required patch is applied and copied. Install no optional code, IRQ hook or
+BIOS-wait hook and do not consume additional game patch space.
+Show these four byte counts on a temporary pre-boot diagnostic screen.
+Unlike existing warning rendering at 0x02100000, diagnostic allocates its
+49152-byte text buffer from the loader's own VRAM A heap, never game RAM.
+If allocation fails, skip display and proceed. Use a local resolved font header,
+free the buffer after A, then perform normal cache flush/boot.
+Test: photograph or transcribe the diagnostic screen, press A, verify game boot,
+and the proven hotkey + race load return and relaunch. Diagnostic may appear
+again whenever a retail game is launched in this test build.
+On-disk ARM7 remains identical; game CARDi template remains byte-identical.
+Hardware pending. Deliver DSPico_Test_114.zip; copy only both loader bins.

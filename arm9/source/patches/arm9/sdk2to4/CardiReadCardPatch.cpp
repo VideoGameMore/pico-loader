@@ -11,6 +11,8 @@
 #include "CardiReadCardPatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 extern "C" u32 patch_cardireadcard_loaderParams[65];
+u32 retailReturnHeapBeforeTotal = 0;
+u32 retailReturnHeapBeforeLargest = 0;
 
 static const u32 sCARDiReadCardPatternUnknown[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90D8u };
 static const u32 sCARDiReadCardPatternSdk20029A7[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90E0u };
@@ -123,6 +125,8 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     // r8 = dst (32 bit aligned)
     // return to CARDi_ReadCard + 0x98
 
+    retailReturnHeapBeforeTotal = patchContext.GetPatchHeap().GetFreeBytes();
+    retailReturnHeapBeforeLargest = patchContext.GetPatchHeap().GetLargestFreeBlock();
     u32 patch1Size = SECTION_SIZE(patch_cardireadcard);
     void* patch1Address = patchContext.GetPatchHeap().Alloc(patch1Size);
     auto loaderPlatform = patchContext.GetLoaderPlatform();

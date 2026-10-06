@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stdlib.h>
 #include <libtwl/mem/memVram.h>
 #include <libtwl/gfx/gfx.h>
 #include <libtwl/gfx/gfxStatus.h>
@@ -20,12 +21,41 @@ static bool readAButton()
     return ((~REG_KEYINPUT) & KEY_A) != 0;
 }
 
-void ErrorDisplay::Print(const char* errorString, bool pressAToContinue)
+bool ErrorDisplay::PrintDiagnostic(const char* statusString)
+{
+    // ARM9 loader heap is in VRAM A. Never use the loaded game's 0x02100000.
+    u8* buffer = (u8*)malloc(256 * 192);
+    if (!buffer)
+        return false;
+    Print(statusString, true, buffer);
+    free(buffer);
+    return true;
+}
+
+void ErrorDisplay::Print(const char* errorString, bool pressAToContinue, u8* diagnosticBuffer)
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
-    auto textBuffer = (u8*)0x02100000;
+    auto textBuffer = diagnosticBuffer ? diagnosticBuffer : (u8*)0x02100000;
     memset(textBuffer, 0, 256 * 192);
-    nft2_unpack((nft2_header_t*)font_nft2);
+    nft2_header_t diagnosticFont;
+    const nft2_header_t* font;
+    if (diagnosticBuffer)
+    {
+        // Resolve a local header; repeated diagnostics must not rebase global font pointers.
+        diagnosticFont = *(const nft2_header_t*)font_nft2;
+        if ((u32)diagnosticFont.glyphInfoPtr < (u32)font_nft2)
+        {
+            diagnosticFont.glyphInfoPtr = (const nft2_glyph_t*)((u32)font_nft2 + (u32)diagnosticFont.glyphInfoPtr);
+            diagnosticFont.charMapPtr = (const nft2_char_map_entry_t*)((u32)font_nft2 + (u32)diagnosticFont.charMapPtr);
+            diagnosticFont.glyphDataPtr = (const u8*)((u32)font_nft2 + (u32)diagnosticFont.glyphDataPtr);
+        }
+        font = &diagnosticFont;
+    }
+    else
+    {
+        nft2_unpack((nft2_header_t*)font_nft2);
+        font = (const nft2_header_t*)font_nft2;
+    }
     nft2_string_render_params_t renderParams =
     {
         x: 0,
@@ -33,7 +63,7 @@ void ErrorDisplay::Print(const char* errorString, bool pressAToContinue)
         width: 256,
         height: 192
     };
-    nft2_renderString((const nft2_header_t*)font_nft2, errorString, textBuffer, 256, &renderParams);
+    nft2_renderString(font, errorString, textBuffer, 256, &renderParams);
     memcpy((void*)GFX_BG_MAIN, textBuffer, 256 * 192);
     waitForVBlank();
     // 4 bit grayscale palette

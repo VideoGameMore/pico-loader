@@ -46,7 +46,35 @@ void PatchHeap::AddFreeSpace(void* block, u32 size)
     _freeBlocks = heapBlock;
 }
 
+u32 PatchHeap::GetFreeBytes() const
+{
+    u32 total = 0;
+    for (auto block = _freeBlocks; block; block = block->next)
+        total += block->size;
+    return total;
+}
+
+u32 PatchHeap::GetLargestFreeBlock() const
+{
+    u32 largest = 0;
+    for (auto block = _freeBlocks; block; block = block->next)
+        if (block->size > largest)
+            largest = block->size;
+    return largest;
+}
+
 void* PatchHeap::Alloc(u32 size)
+{
+    void* result = TryAlloc(size);
+    if (!result)
+    {
+        LOG_FATAL("No space found to put patch of size 0x%x\n", size);
+        while (1);
+    }
+    return result;
+}
+
+void* PatchHeap::TryAlloc(u32 size)
 {
     PatchHeapBlock* prev = nullptr;
     PatchHeapBlock* cur = _freeBlocks;
@@ -69,11 +97,7 @@ void* PatchHeap::Alloc(u32 size)
     }
 
     if (!bestBlock)
-    {
-        LOG_FATAL("No space found to put patch of size 0x%x\n", size);
-        while (1);
         return nullptr;
-    }
 
     void* result = bestBlock->block;
 

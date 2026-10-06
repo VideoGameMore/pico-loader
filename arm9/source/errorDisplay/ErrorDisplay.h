@@ -19,6 +19,10 @@ public:
         Print(errorString, false);
     }
 
+    /// @brief Temporary test status using loader-owned VRAM heap, preserving game RAM.
+    /// @return False if the temporary display buffer could not be allocated.
+    bool PrintDiagnostic(const char* statusString);
+
 private:
-    void Print(const char* errorString, bool pressAToContinue);
+    void Print(const char* errorString, bool pressAToContinue, u8* diagnosticBuffer = nullptr);
 };
