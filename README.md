@@ -8,15 +8,17 @@ Hold **L + R + Down + Select** to return from a retail Nintendo DS game to the P
 
 ## Install
 
-For an existing working DSPico/Pico installation:
+Download **`DSPico_QuickReturn_Full_Build_137.zip`** from the release for a complete SD-card software setup. It includes LNH-team's original Pico Launcher v1.3.0, both themes, the tested QuickReturn loaders, databases, installation notes and license notices.
 
-1. Power off and back up your current loader files.
-2. Extract `DSPico_Build_137.zip` from the release.
-3. Replace only `picoLoader7.bin` and `picoLoader9.bin` in your existing `/_pico/` folder (or the location your current installation uses).
-4. Safely eject the card and start the console.
-5. Launch a game, then hold **L + R + Down + Select** for approximately half a second to request a return to Pico.
+1. Power off and back up your SD card, including games and saves.
+2. Extract the ZIP directly to the card root, without an extra enclosing folder.
+3. Confirm `_picoboot.nds` and `_pico/` are at the root. Put your `.nds` games in the root **`nds_games/`** folder.
+4. For an existing installation, merge folders and preserve settings, saves and BIOS files.
+5. Safely eject, boot DSPico and launch a game. Save your progress, then hold **L + R + Down + Select** for approximately half a second to return to Pico.
 
-Save your progress in the game before returning. The package updates an existing installation; it does not include a complete firmware or launcher setup.
+Requires a DSPico cartridge with working firmware. Games, Nintendo BIOS, NAND files and firmware flashing are not included. The full bundle preserves the exact hardware-tested Build 137 loaders; the assembled package has not had a separate hardware test.
+
+**Updating only the loaders?** Use the smaller `DSPico_Build_137.zip` and replace `picoLoader7.bin` and `picoLoader9.bin` inside your existing `/_pico/` folder.
 
 ## What makes QuickReturn work
 
