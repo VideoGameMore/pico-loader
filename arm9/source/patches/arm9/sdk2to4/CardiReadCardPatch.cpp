@@ -1,4 +1,6 @@
 #include "common.h"
+#include "ndsHeader.h"
+#include "sharedMemory.h"
 #include "patches/PatchContext.h"
 #include "fileInfo.h"
 #include "thumbInstructions.h"
