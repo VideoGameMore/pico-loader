@@ -46,17 +46,19 @@ extern "C" u32 patch_retailreturnwait_takeover;
 extern u32 retailReturnTakeoverAddress;
 extern u32 retailReturnFixAddress;
 u32 retailReturnWaitHookCount = 0;
+u32 retailReturnArmWaitHookCount = 0;
 u32 retailReturnWaitSite = 0;
 u32 retailReturnWaitStub = 0;
 u32 retailReturnWaitState = 0;
 u32 retailReturnNearbyTotal = 0;
 u32 retailReturnNearbyMax = 0;
 
-static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header, bool patchesInParent)
+static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header, bool patchesInParent, u32 staticBytes)
 {
     retailReturnWaitState = 1;
     retailReturnNearbyTotal = retailReturnNearbyMax = 0;
     retailReturnWaitHookCount = 0;
+    retailReturnArmWaitHookCount = 0;
     retailReturnWaitSite = retailReturnWaitStub = 0;
     if (!retailReturnTakeoverAddress || !retailReturnFixAddress || header->arm9Size < 0x800)
         return;
@@ -74,8 +76,24 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
             continue;
         sites[count++] = &secure[i];
     }
+    // Match only static ARM wrappers; autoload payloads relocate at game boot.
+    u32* armSites[8] = {};
+    u32 armCount = 0;
+    auto words = (u32*)header->arm9LoadAddress;
+    for (u32 i = 0x800 / 4; i + 1 < staticBytes / 4 && armCount < 8; ++i)
+    {
+        const u32 svc = words[i];
+        if (words[i + 1] != 0xE12FFF1E)
+            continue;
+        if (svc != 0xEF030000 && svc != 0xEF040000 &&
+            svc != 0xEF050000 && svc != 0xEF060000)
+            continue;
+        if ((svc == 0xEF040000 || svc == 0xEF050000) && words[i - 1] != 0xE3A02000)
+            continue;
+        armSites[armCount++] = &words[i];
+    }
     retailReturnWaitState = 2;
-    if (!count)
+    if (!count && !armCount)
         return;
     const u32 codeSize = (SECTION_SIZE(patch_retailreturnwait) + 3) & ~3u;
     PatchHeap nearbyHeap;
@@ -141,7 +159,36 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
         *sites[i] = 0xE000 | ((delta >> 1) & 0x7FF);
         ++retailReturnWaitHookCount;
     }
-    retailReturnWaitState = retailReturnWaitHookCount ? 8 : 7;
+    // ARM branch preserves LR, so original caller survives the detour.
+    // Reuse the same checker; allocate no second helper.
+    u32* armStubs[8] = {};
+    for (u32 i = 0; i < armCount; ++i)
+    {
+        auto allocation = (u8*)stubHeap->TryAlloc(32);
+        if (!allocation)
+            continue;
+        auto stub = (u32*)(((u32)allocation + 3) & ~3u);
+        int delta = (int)stub - (int)armSites[i] - 8;
+        if ((delta & 3) || delta < -33554432 || delta > 33554428)
+            continue;
+        stub[0] = 0xE92D500F; // save BIOS arguments, r12, caller LR
+        stub[1] = 0xE59FC00C; // helper literal at stub+24
+        stub[2] = 0xE12FFF3C; // blx r12
+        stub[3] = 0xE8BD500F;
+        stub[4] = *armSites[i]; // original BIOS call
+        stub[5] = 0xE12FFF1E; // bx original LR
+        stub[6] = entry;
+        armStubs[i] = stub;
+    }
+    for (u32 i = 0; i < armCount; ++i)
+    {
+        if (!armStubs[i])
+            continue;
+        int delta = (int)armStubs[i] - (int)armSites[i] - 8;
+        *armSites[i] = 0xEA000000 | ((delta >> 2) & 0xFFFFFF);
+        ++retailReturnArmWaitHookCount;
+    }
+    retailReturnWaitState = (retailReturnWaitHookCount || retailReturnArmWaitHookCount) ? 8 : 7;
 
 }
 
@@ -349,7 +396,11 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     }
     if (sdkVersion != 0 && !sdkVersion.IsTwlSdk())
     {
-        installRetailWaitHooks(patchContext, romHeader, patchesInParent);
+        u32 staticBytes = arm9Size;
+        if (moduleParams && moduleParams->autoloadStart >= romHeader->arm9LoadAddress &&
+            (u64)moduleParams->autoloadStart <= (u64)romHeader->arm9LoadAddress + arm9Size)
+            staticBytes = moduleParams->autoloadStart - romHeader->arm9LoadAddress;
+        installRetailWaitHooks(patchContext, romHeader, patchesInParent, staticBytes);
         ErrorDisplay().PrintPatchSpaceDiagnostic(
             retailReturnHeapBeforeTotal,
             retailReturnHeapBeforeLargest,

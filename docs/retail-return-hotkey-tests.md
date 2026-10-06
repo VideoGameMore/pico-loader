@@ -632,3 +632,29 @@ Otherwise SITE/STUB identify final attempted pair. Publish only after all
 accepted stubs are written. No new IRQ edits or modified loader handoff.
 Hardware pending: photograph, A, verify boot and menu-only hotkey, fallback
 race if necessary, Pico navigation and relaunch. Deliver DSPico_Test_120.zip.
+
+Hardware Test 120 October 6: STATE 8, nearby total 1936/max128, parent after80,
+SITE33556378, STUB33554584, WAIT HOOKS4. Fragmentation explains Test119:
+its single188-byte request could not fit a128-byte largest block.
+Game boots. Hotkey plus active menu navigation stays in-game. After idle,
+attract/demo mode returns to Pico; race start also returns. Existing read
+fallback is sufficient to explain both exits. The four Thumb secure wrappers
+are installed but timely menu-trigger execution is not demonstrated.
+
+## Test 121: add recognized static ARM BIOS wait wrappers
+
+Keep Test120's installed Thumb hooks and same ARM checker. Scan static ARM9
+image after secure0x800 for exact unconditional ARM SVC3/4/5/6 plus BX LR;
+SVC4/5 additionally require preceding MOV r2,#0. Stop before module-parameter
+autoloadStart when it lies within image, avoiding branch rewriting in payloads
+whose runtime addresses relocate. No IRQ/vector/table edits.
+Each optional aligned32-byte reservation contains a28-byte ARM stub saving
+r0-r3,r12,LR, calling existing checker, restoring registers, executing original
+SVC and returning via preserved LR. Replace only SVC with non-linking ARM B.
+Check full signed branch range/alignment before publishing. Reuse the existing
+nearby heap; nonfatal allocation preserves game boot and fallback.
+Diagnostic shows THUMB HOOKS and ARM HOOKS separately. ARM wrapper existence,
+boot safety and menu reachability remain hardware tests, not assumptions.
+Test: photograph counts, A, verify boot, hotkey plus menu navigation without
+waiting for attract mode. Then fallback/demo if necessary, usable Pico/relaunch.
+Deliver DSPico_Test_121.zip; replace only both loader bins.

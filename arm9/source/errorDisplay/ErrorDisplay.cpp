@@ -1,5 +1,6 @@
 #include "common.h"
 extern u32 retailReturnWaitHookCount;
+extern u32 retailReturnArmWaitHookCount;
 extern u32 retailReturnWaitSite;
 extern u32 retailReturnWaitStub;
 extern u32 retailReturnWaitState;
@@ -176,14 +177,14 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
     fastClear((void*)GFX_BG_MAIN, 0x10000);
-    drawPatchText("TEST 120 WAIT INSTALL", 8, 4);
+    drawPatchText("TEST 121 WAIT INSTALL", 8, 4);
     drawPatchValue("STATE ", retailReturnWaitState, 24);
     drawPatchValue("NEAR TOTAL ", retailReturnNearbyTotal, 44);
     drawPatchValue("NEAR MAX ", retailReturnNearbyMax, 64);
     drawPatchValue("AFTER TOTAL ", afterTotal, 84);
-    drawPatchValue(retailReturnWaitState == 4 ? "WORD ZERO " : "SITE ", retailReturnWaitSite, 104);
-    drawPatchValue(retailReturnWaitState == 4 ? "WORD ONE " : "STUB ", retailReturnWaitStub, 124);
-    drawPatchValue("WAIT HOOKS ", retailReturnWaitHookCount, 144);
+    drawPatchValue("THUMB HOOKS ", retailReturnWaitHookCount, 104);
+    drawPatchValue("ARM HOOKS ", retailReturnArmWaitHookCount, 124);
+    drawPatchValue("WAIT HOOKS ", retailReturnWaitHookCount + retailReturnArmWaitHookCount, 144);
     drawPatchText("PHOTO THEN PRESS A", 8, 168);
 
     waitForVBlank();
