@@ -10,7 +10,7 @@
 #include "CardiReadCardPatchAsm.h"
 #include "CardiReadCardPatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
-extern "C" u32 patch_cardireadcard_loaderParams[65];
+extern "C" u32 patch_cardireadcard_loaderParams[33];
 u32 retailReturnHeapBeforeTotal = 0;
 u32 retailReturnHeapBeforeLargest = 0;
 

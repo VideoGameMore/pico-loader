@@ -48,7 +48,7 @@ static u16 sIsCloneBootRom;
 static u16 sRunInDSiMode;
 static loader_info_t sLoaderInfo;
 extern "C" u32 patch_cardireadcard_loader9Extents[10];
-extern "C" u32 patch_cardireadcard_loaderParams[65];
+extern "C" u32 patch_cardireadcard_loaderParams[33];
 static void** sSoftResetCheatsPointer = nullptr;
 
 u16 gIsDsiMode;
@@ -185,8 +185,16 @@ static void handleInitializeLoaderInfoCommand()
     // Test 107: preserve return target in the relocated ARM9 read patch.
     patch_retailhotkeydetect_loaderParamsAddress = 0;
     patch_cardireadcard_loaderParams[0] = sLoaderInfo.picoLoaderBootDrive & 0x7FFF;
-    memcpy(&patch_cardireadcard_loaderParams[1], sLoaderInfo.launcherPath, 256);
-    ((char*)&patch_cardireadcard_loaderParams[1])[255] = 0;
+    // Test 116: reclaim 128 game-patch bytes. Never truncate a return path.
+    u32 returnPathLength = 0;
+    while (returnPathLength < 128 && sLoaderInfo.launcherPath[returnPathLength])
+        ++returnPathLength;
+    bool returnPathValid = returnPathLength != 0 && returnPathLength < 128;
+    memset(&patch_cardireadcard_loaderParams[1], 0, 128);
+    if (returnPathValid)
+        memcpy(&patch_cardireadcard_loaderParams[1], sLoaderInfo.launcherPath, returnPathLength);
+    else
+        LOG_DEBUG("Retail hotkey disabled: launcher path exceeds compact capacity or is empty\n");
 
     // Test 93: bake bounded physical extents for the complete 48480-byte
     // ARM7 loader into the injected patch. No runtime ARM9 mailbox is needed.
@@ -246,6 +254,10 @@ static void handleInitializeLoaderInfoCommand()
     }
     if (!loader9MapValid || loader9Sectors == 0)
         memset(patch_cardireadcard_loader9Extents, 0, 40);
+
+    // Disable the ARM7 request before takeover when compact parameters cannot fit.
+    if (!returnPathValid)
+        memset(patch_retailhotkeydetect_loaderExtents, 0, 64);
 
     dc_flushAll();
     dc_drainWriteBuffer();

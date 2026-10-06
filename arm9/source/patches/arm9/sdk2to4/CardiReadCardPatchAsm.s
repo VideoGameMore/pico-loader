@@ -235,7 +235,7 @@ retailArm9EntryWords:
     .word 0xE59F011C, 0xE5C00000, 0xE59F0118, 0xEE010F10
 .global patch_cardireadcard_loaderParams
 patch_cardireadcard_loaderParams:
-    .space 260 // u32 boot drive, 256-byte launcher path
+    .space 132 // Test 116: u32 boot drive, bounded 128-byte launcher path
 
 .global patch_cardireadcard_loader9Extents
 patch_cardireadcard_loader9Extents:

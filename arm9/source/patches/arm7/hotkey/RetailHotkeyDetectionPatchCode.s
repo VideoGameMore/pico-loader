@@ -260,7 +260,7 @@ setup_launcher_header:
     beq launcher_params_bad
     ldr r4, launcherRomPath
     ldr r5, launcherReturnPath
-    movs r1, #64
+    movs r1, #32 // Test 116: compact path; fresh disk header remainder stays zero
 launcher_copy_path:
     ldr r3, [r2]
     str r3, [r4]

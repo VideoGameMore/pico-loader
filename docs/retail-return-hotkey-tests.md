@@ -512,6 +512,22 @@ RAM scratch storage. Existing warning/error renderer is restored unchanged.
 Print the same four capacity values and the 680-byte base patch requirement.
 No new game hook or game patch allocation. Keep 114 capacity bookkeeping and
 nonfatal optional allocator; working CARDi and ARM7 stay byte-identical to 109.
-Hardware pending. Photograph visible status, press A, then boot and original
+Hardware PASS October 5: visible diagnostic reports before total/max 1240, after total/max 76, base 680. Pressing A boots game; original return and relaunch work without freezing. Photograph visible status, press A, then boot and original
 hotkey + race load return/relaunch. Return trigger still requires next read.
 Deliver DSPico_Test_115.zip; copy only both loader bins.
+
+## Test 116: reclaim 128 bytes from persisted launcher parameters
+
+115 confirms only 76 contiguous bytes remain after required patches. Compact
+the persisted launcher path from 256 to 128 bytes, reducing CARDi from 680 to
+552 bytes. Copy only 32 words into fresh loader headers, whose remaining path
+bytes are zero on disk. Require a nonempty complete NUL-terminated path within
+127 characters; otherwise leave game boot intact and disable the ARM7 hotkey
+request by clearing its extent map. Never truncate a pathname or enter takeover
+with invalid parameters. Ordinary game reads and the working loader/DLDI
+handoff remain unchanged. No new trigger is installed yet.
+Expected Mario Kart diagnostic: before total/max 1240, after total/max 204,
+base patch 552. Photograph counts, press A, then verify the same hotkey plus
+race load, usable Pico menu and successful relaunch. Hardware pending.
+Both on-disk loaders still copied; ARM7 binary expected byte-identical to 109.
+Deliver DSPico_Test_116.zip.
