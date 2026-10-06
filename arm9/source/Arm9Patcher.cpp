@@ -47,18 +47,20 @@ extern u32 retailReturnTakeoverAddress;
 extern u32 retailReturnFixAddress;
 u32 retailReturnWaitHookCount = 0;
 u32 retailReturnArmWaitHookCount = 0;
+u32 retailReturnAutoloadWaitHookCount = 0;
 u32 retailReturnWaitSite = 0;
 u32 retailReturnWaitStub = 0;
 u32 retailReturnWaitState = 0;
 u32 retailReturnNearbyTotal = 0;
 u32 retailReturnNearbyMax = 0;
 
-static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header, bool patchesInParent, u32 staticBytes)
+static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header, bool patchesInParent, u32 imageBytes)
 {
     retailReturnWaitState = 1;
     retailReturnNearbyTotal = retailReturnNearbyMax = 0;
     retailReturnWaitHookCount = 0;
     retailReturnArmWaitHookCount = 0;
+    retailReturnAutoloadWaitHookCount = 0;
     retailReturnWaitSite = retailReturnWaitStub = 0;
     if (!retailReturnTakeoverAddress || !retailReturnFixAddress || header->arm9Size < 0x800)
         return;
@@ -76,11 +78,13 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
             continue;
         sites[count++] = &secure[i];
     }
-    // Match only static ARM wrappers; autoload payloads relocate at game boot.
+    // Autoload bytes are patched in place, but branches use their final PC.
     u32* armSites[8] = {};
     u32 armCount = 0;
+    u32 armRuntimeSites[8] = {};
+    const auto adjuster = context.GetAutoloadAdjuster();
     auto words = (u32*)header->arm9LoadAddress;
-    for (u32 i = 0x800 / 4; i + 1 < staticBytes / 4 && armCount < 8; ++i)
+    for (u32 i = 0x800 / 4; i + 1 < imageBytes / 4 && armCount < 8; ++i)
     {
         const u32 svc = words[i];
         if (words[i + 1] != 0xE12FFF1E)
@@ -90,6 +94,20 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
             continue;
         if ((svc == 0xEF040000 || svc == 0xEF050000) && words[i - 1] != 0xE3A02000)
             continue;
+        const u32 initial = (u32)&words[i];
+        const u32 runtime = adjuster ? adjuster->AdjustInitialToFinal(initial) : initial;
+        // Never publish across an autoload boundary or into an unmapped region.
+        if ((runtime & 3) || (adjuster &&
+            adjuster->AdjustInitialToFinal(initial + 4) != runtime + 4))
+            continue;
+        if ((svc == 0xEF040000 || svc == 0xEF050000) && adjuster &&
+            adjuster->AdjustInitialToFinal(initial - 4) != runtime - 4)
+            continue;
+        if (runtime != initial &&
+            !((runtime >= 0x01FF8000 && runtime < 0x02000000) ||
+              (runtime >= 0x02003000 && runtime < 0x02400000)))
+            continue;
+        armRuntimeSites[armCount] = runtime;
         armSites[armCount++] = &words[i];
     }
     retailReturnWaitState = 2;
@@ -168,7 +186,7 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
         if (!allocation)
             continue;
         auto stub = (u32*)(((u32)allocation + 3) & ~3u);
-        int delta = (int)stub - (int)armSites[i] - 8;
+        int delta = (int)stub - (int)armRuntimeSites[i] - 8;
         if ((delta & 3) || delta < -33554432 || delta > 33554428)
             continue;
         stub[0] = 0xE92D500F; // save BIOS arguments, r12, caller LR
@@ -184,9 +202,11 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
     {
         if (!armStubs[i])
             continue;
-        int delta = (int)armStubs[i] - (int)armSites[i] - 8;
+        int delta = (int)armStubs[i] - (int)armRuntimeSites[i] - 8;
         *armSites[i] = 0xEA000000 | ((delta >> 2) & 0xFFFFFF);
         ++retailReturnArmWaitHookCount;
+        if (armRuntimeSites[i] != (u32)armSites[i])
+            ++retailReturnAutoloadWaitHookCount;
     }
     retailReturnWaitState = (retailReturnWaitHookCount || retailReturnArmWaitHookCount) ? 8 : 7;
 
@@ -396,11 +416,7 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     }
     if (sdkVersion != 0 && !sdkVersion.IsTwlSdk())
     {
-        u32 staticBytes = arm9Size;
-        if (moduleParams && moduleParams->autoloadStart >= romHeader->arm9LoadAddress &&
-            (u64)moduleParams->autoloadStart <= (u64)romHeader->arm9LoadAddress + arm9Size)
-            staticBytes = moduleParams->autoloadStart - romHeader->arm9LoadAddress;
-        installRetailWaitHooks(patchContext, romHeader, patchesInParent, staticBytes);
+        installRetailWaitHooks(patchContext, romHeader, patchesInParent, arm9Size);
         ErrorDisplay().PrintPatchSpaceDiagnostic(
             retailReturnHeapBeforeTotal,
             retailReturnHeapBeforeLargest,

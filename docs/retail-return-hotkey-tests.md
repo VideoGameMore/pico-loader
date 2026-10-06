@@ -658,3 +658,30 @@ boot safety and menu reachability remain hardware tests, not assumptions.
 Test: photograph counts, A, verify boot, hotkey plus menu navigation without
 waiting for attract mode. Then fallback/demo if necessary, usable Pico/relaunch.
 Deliver DSPico_Test_121.zip; replace only both loader bins.
+
+Hardware Test 121 October 6: STATE8, nearby1936/max128, parent after80,
+THUMB HOOKS4, ARM HOOKS0. User confirms same behavior: game boots;
+hotkey does not immediately exit; starting a race returns to Pico.
+No new ARM hook was installed, so this did not extend trigger coverage.
+
+## Test 122: recognize relocated ARM BIOS wait wrappers
+
+121 scans only static code. Extend the exact SVC3/4/5/6 plus BX LR search
+through the decompressed NTR ARM9 image, using PatchContext's existing
+AutoloadAdjuster to calculate each instruction's final runtime address.
+Require wrapper instructions (including MOV r2,#0 for SVC4/5) to retain
+contiguous runtime addresses. Relocated targets are accepted only in standard
+SDK ITCM 0x01FF8000..0x02000000 or main RAM 0x02003000..0x02400000,
+excluding secure stub and parent-helper regions. Other relocations are skipped.
+Encode and bound-check the branch from the final PC; write it to original
+payload bytes for game startup to copy. Original SVC is replayed in the same
+28-byte ARM stub; registers, caller LR, existing checker and fallback unchanged.
+Nonfatal allocation, signed ARM branch bounds and prepare-before-publish retained.
+No IRQ edits. ARM7 and required CARDi transfer code unchanged.
+Diagnostic AUTO HOOKS counts installed relocated ARM wrappers, a subset of
+ARM HOOKS. If ARM/AUTO remain zero, no additional menu execution path was
+installed and the photograph itself establishes that result; do not infer
+wait calls are absent from every game or that installed hooks are reached.
+Hardware pending: photo, press A, verify boot, then menu hotkey while moving
+through menus. If no immediate return, race fallback; verify usable Pico.
+Deliver DSPico_Test_122.zip; replace only picoLoader7.bin and picoLoader9.bin.
