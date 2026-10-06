@@ -19,10 +19,10 @@ public:
         Print(errorString, false);
     }
 
-    /// @brief Temporary test status using loader-owned VRAM heap, preserving game RAM.
-    /// @return False if the temporary display buffer could not be allocated.
-    bool PrintDiagnostic(const char* statusString);
+    /// @brief Temporary test screen; draw directly with VRAM-safe halfword writes.
+    void PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
+        u32 afterTotal, u32 afterLargest);
 
 private:
-    void Print(const char* errorString, bool pressAToContinue, u8* diagnosticBuffer = nullptr);
+    void Print(const char* errorString, bool pressAToContinue);
 };

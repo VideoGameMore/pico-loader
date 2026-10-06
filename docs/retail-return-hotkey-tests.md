@@ -495,4 +495,23 @@ Test: photograph or transcribe the diagnostic screen, press A, verify game boot,
 and the proven hotkey + race load return and relaunch. Diagnostic may appear
 again whenever a retail game is launched in this test build.
 On-disk ARM7 remains identical; game CARDi template remains byte-identical.
-Hardware pending. Deliver DSPico_Test_114.zip; copy only both loader bins.
+Hardware October 5: after selecting Mario Kart, initial white changes to black
+screens without text. Pressing A boots Mario Kart. This was a blank waiting
+diagnostic, not confirmed game boot failure. Capacity values remain unreadable;
+return/relaunch not yet explicitly reported for 114.
+Deliver DSPico_Test_114.zip; copy only both loader bins.
+
+## Test 115: readable direct diagnostic rendering
+
+114 waits for A and then boots Mario Kart; text buffer failed to show glyphs.
+Its pixel renderer writes bytes into a text buffer allocated from VRAM A heap.
+Replace this diagnostic with fixed 5x7 uppercase/digit glyphs drawn at 2x scale
+directly into VRAM E's 8-bit bitmap using halfword read-modify-writes. No dynamic
+text buffer, formatting library, font relocation, byte pixel writes, or game
+RAM scratch storage. Existing warning/error renderer is restored unchanged.
+Print the same four capacity values and the 680-byte base patch requirement.
+No new game hook or game patch allocation. Keep 114 capacity bookkeeping and
+nonfatal optional allocator; working CARDi and ARM7 stay byte-identical to 109.
+Hardware pending. Photograph visible status, press A, then boot and original
+hotkey + race load return/relaunch. Return trigger still requires next read.
+Deliver DSPico_Test_115.zip; copy only both loader bins.

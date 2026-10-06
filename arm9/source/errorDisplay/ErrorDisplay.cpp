@@ -1,5 +1,4 @@
 #include "common.h"
-#include <stdlib.h>
 #include <libtwl/mem/memVram.h>
 #include <libtwl/gfx/gfx.h>
 #include <libtwl/gfx/gfxStatus.h>
@@ -21,41 +20,12 @@ static bool readAButton()
     return ((~REG_KEYINPUT) & KEY_A) != 0;
 }
 
-bool ErrorDisplay::PrintDiagnostic(const char* statusString)
-{
-    // ARM9 loader heap is in VRAM A. Never use the loaded game's 0x02100000.
-    u8* buffer = (u8*)malloc(256 * 192);
-    if (!buffer)
-        return false;
-    Print(statusString, true, buffer);
-    free(buffer);
-    return true;
-}
-
-void ErrorDisplay::Print(const char* errorString, bool pressAToContinue, u8* diagnosticBuffer)
+void ErrorDisplay::Print(const char* errorString, bool pressAToContinue)
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
-    auto textBuffer = diagnosticBuffer ? diagnosticBuffer : (u8*)0x02100000;
+    auto textBuffer = (u8*)0x02100000;
     memset(textBuffer, 0, 256 * 192);
-    nft2_header_t diagnosticFont;
-    const nft2_header_t* font;
-    if (diagnosticBuffer)
-    {
-        // Resolve a local header; repeated diagnostics must not rebase global font pointers.
-        diagnosticFont = *(const nft2_header_t*)font_nft2;
-        if ((u32)diagnosticFont.glyphInfoPtr < (u32)font_nft2)
-        {
-            diagnosticFont.glyphInfoPtr = (const nft2_glyph_t*)((u32)font_nft2 + (u32)diagnosticFont.glyphInfoPtr);
-            diagnosticFont.charMapPtr = (const nft2_char_map_entry_t*)((u32)font_nft2 + (u32)diagnosticFont.charMapPtr);
-            diagnosticFont.glyphDataPtr = (const u8*)((u32)font_nft2 + (u32)diagnosticFont.glyphDataPtr);
-        }
-        font = &diagnosticFont;
-    }
-    else
-    {
-        nft2_unpack((nft2_header_t*)font_nft2);
-        font = (const nft2_header_t*)font_nft2;
-    }
+    nft2_unpack((nft2_header_t*)font_nft2);
     nft2_string_render_params_t renderParams =
     {
         x: 0,
@@ -63,7 +33,7 @@ void ErrorDisplay::Print(const char* errorString, bool pressAToContinue, u8* dia
         width: 256,
         height: 192
     };
-    nft2_renderString(font, errorString, textBuffer, 256, &renderParams);
+    nft2_renderString((const nft2_header_t*)font_nft2, errorString, textBuffer, 256, &renderParams);
     memcpy((void*)GFX_BG_MAIN, textBuffer, 256 * 192);
     waitForVBlank();
     // 4 bit grayscale palette
@@ -104,6 +74,135 @@ void ErrorDisplay::Print(const char* errorString, bool pressAToContinue, u8* dia
     {
         while (true);
     }
+
+    REG_MASTER_BRIGHT = 0x4010;
+    REG_MASTER_BRIGHT_SUB = 0x4010;
+    REG_DISPCNT = 0;
+    REG_DISPCNT_SUB = 0;
+    mem_setVramEMapping(MEM_VRAM_E_LCDC);
+    fastClear((void*)0x06880000, 0x10000);
+    fastClear((void*)GFX_PLTT_BG_MAIN, 512);
+    fastClear((void*)GFX_PLTT_BG_SUB, 512);
+}
+
+namespace
+{
+const u8 patchLetters[26][7] = {
+    {14,17,17,31,17,17,17}, {30,17,17,30,17,17,30},
+    {14,17,16,16,16,17,14}, {30,17,17,17,17,17,30},
+    {31,16,16,30,16,16,31}, {31,16,16,30,16,16,16},
+    {14,17,16,23,17,17,15}, {17,17,17,31,17,17,17},
+    {14,4,4,4,4,4,14}, {7,2,2,2,18,18,12},
+    {17,18,20,24,20,18,17}, {16,16,16,16,16,16,31},
+    {17,27,21,21,17,17,17}, {17,25,21,19,17,17,17},
+    {14,17,17,17,17,17,14}, {30,17,17,30,16,16,16},
+    {14,17,17,17,21,18,13}, {30,17,17,30,20,18,17},
+    {15,16,16,14,1,1,30}, {31,4,4,4,4,4,4},
+    {17,17,17,17,17,17,14}, {17,17,17,17,17,10,4},
+    {17,17,17,21,21,21,10}, {17,17,10,4,10,17,17},
+    {17,17,10,4,4,4,4}, {31,1,2,4,8,16,31}
+};
+const u8 patchDigits[10][7] = {
+    {14,17,19,21,25,17,14}, {4,12,4,4,4,4,14},
+    {14,17,1,2,4,8,31}, {30,1,1,14,1,1,30},
+    {2,6,10,18,31,2,2}, {31,16,16,30,1,1,30},
+    {14,16,16,30,17,17,14}, {31,1,2,4,8,8,8},
+    {14,17,17,14,17,17,14}, {14,17,17,15,1,1,14}
+};
+
+void drawPatchCharacter(char c, int x, int y)
+{
+    const u8* glyph = nullptr;
+    if (c >= 'A' && c <= 'Z')
+        glyph = patchLetters[c - 'A'];
+    else if (c >= '0' && c <= '9')
+        glyph = patchDigits[c - '0'];
+    if (!glyph)
+        return;
+    for (int row = 0; row < 7; row++)
+        for (int col = 0; col < 5; col++)
+            if (glyph[row] & (1 << (4 - col)))
+                for (int dy = 0; dy < 2; dy++)
+                    for (int dx = 0; dx < 2; dx++)
+                    {
+                        int px = x + col * 2 + dx;
+                        int py = y + row * 2 + dy;
+                        if (px >= 256 || py >= 192)
+                            continue;
+                        // VRAM pixels are always written as halfwords.
+                        vu16* pixel = (vu16*)GFX_BG_MAIN + py * 128 + (px >> 1);
+                        u16 mask = (px & 1) ? 0xFF00 : 0x00FF;
+                        u16 white = (px & 1) ? 0x0F00 : 0x000F;
+                        *pixel = (*pixel & ~mask) | white;
+                    }
+}
+
+int drawPatchText(const char* text, int x, int y)
+{
+    while (*text)
+    {
+        drawPatchCharacter(*text++, x, y);
+        x += 12;
+    }
+    return x;
+}
+
+void drawPatchValue(const char* label, u32 value, int y)
+{
+    int x = drawPatchText(label, 8, y);
+    char digits[10];
+    u32 count = 0;
+    do
+    {
+        digits[count++] = '0' + value % 10;
+        value /= 10;
+    } while (value && count < sizeof(digits));
+    while (count)
+    {
+        drawPatchCharacter(digits[--count], x, y);
+        x += 12;
+    }
+}
+}
+
+void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
+    u32 afterTotal, u32 afterLargest)
+{
+    mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
+    fastClear((void*)GFX_BG_MAIN, 0x10000);
+    drawPatchText("TEST 115 PATCH SPACE", 8, 4);
+    drawPatchValue("BEFORE TOTAL ", beforeTotal, 28);
+    drawPatchValue("BEFORE MAX ", beforeLargest, 48);
+    drawPatchValue("AFTER TOTAL ", afterTotal, 68);
+    drawPatchValue("AFTER MAX ", afterLargest, 88);
+    drawPatchValue("BASE PATCH ", 680, 116);
+    drawPatchText("PHOTO THEN PRESS A", 8, 148);
+
+    waitForVBlank();
+    GFX_PLTT_BG_MAIN[0] = 0;
+    GFX_PLTT_BG_MAIN[15] = 0x7FFF;
+    REG_BG3PA = 256;
+    REG_BG3PB = 0;
+    REG_BG3PC = 0;
+    REG_BG3PD = 256;
+    REG_BG3X = 0;
+    REG_BG3Y = 0;
+    REG_BG3CNT = (1 << 7) | (1 << 14);
+    REG_BLDCNT = 0;
+    REG_DISPCNT = 3 | (1 << 11) | (1 << 16);
+    REG_MASTER_BRIGHT = 0;
+    GFX_PLTT_BG_SUB[0] = 0;
+    REG_MASTER_BRIGHT_SUB = 0x8010;
+    REG_DISPCNT_SUB = 0x10000;
+    bool previousA = readAButton();
+    do
+    {
+        waitForVBlank();
+        bool currentA = readAButton();
+        if (currentA && !previousA)
+            break;
+        previousA = currentA;
+    } while (true);
 
     REG_MASTER_BRIGHT = 0x4010;
     REG_MASTER_BRIGHT_SUB = 0x4010;
