@@ -173,7 +173,7 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
     fastClear((void*)GFX_BG_MAIN, 0x10000);
-    drawPatchText("TEST 118 PATCH SPACE", 8, 4);
+    drawPatchText("TEST 119 PATCH SPACE", 8, 4);
     drawPatchValue("BEFORE TOTAL ", beforeTotal, 28);
     drawPatchValue("SITE ", retailReturnWaitSite, 48);
     drawPatchValue("AFTER TOTAL ", afterTotal, 68);

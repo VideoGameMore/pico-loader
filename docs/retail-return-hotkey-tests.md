@@ -568,3 +568,26 @@ Diagnostic keeps installed WAIT HOOKS and remaining capacity. This tests
 placement and installs only branches the encoder can represent.
 Hardware pending. Photograph before A, verify boot, menu-only hotkey and
 fallback race if necessary. Deliver DSPico_Test_118.zip, copy both bins only.
+
+Hardware Test 118 October 5 photo: before 1240, after total/max 16,
+SITE 33556378 (0x0200079A), STUB 33566684 (0x02002FDC), WAIT HOOKS 0.
+Branch displacement is 11302 (stub-site-4), beyond +2046. Required patches
+are in the existing .parent area, not adjacent to secure BIOS wrappers.
+Photo establishes placement failure; boot/fallback result not yet reported.
+
+## Test 119: nearby optional secure heap when required patches use parent
+
+Track the existing selection of .parent memory for mandatory patches.
+If that mode is used and the entire secure 0x800 region is disjoint from
+parent, discover unused secure space through the existing syscall locator
+into a separate optional heap. Allocate the same aligned 188-byte maximum
+helper/stub block there. Preserve recognized syscall wrappers; no fixed
+scratch address or newly claimed game RAM. If required patches instead used
+secure space, keep using their existing residual heap and never rediscover
+occupied space. Nonfatal allocation and individual branch checks retained.
+Existing ARM7 and CARDi payload remain unchanged. Diagnostic SITE/STUB should
+now be nearby and WAIT HOOKS should be nonzero; parent free count may remain
+204 because optional code uses a separate region.
+Hardware pending: photograph, A, game boot, menu-only hotkey, Pico navigation
+and relaunch. Check race fallback if menu trigger has no response.
+Deliver DSPico_Test_119.zip, copy only picoLoader7.bin and picoLoader9.bin.

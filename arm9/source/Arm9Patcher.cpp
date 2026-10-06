@@ -49,7 +49,7 @@ u32 retailReturnWaitHookCount = 0;
 u32 retailReturnWaitSite = 0;
 u32 retailReturnWaitStub = 0;
 
-static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header)
+static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header, bool patchesInParent)
 {
     retailReturnWaitHookCount = 0;
     retailReturnWaitSite = retailReturnWaitStub = 0;
@@ -74,7 +74,20 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
     const u32 codeSize = (SECTION_SIZE(patch_retailreturnwait) + 3) & ~3u;
     // One optional allocation after all mandatory patches and copies.
     // Failure leaves every BIOS wrapper untouched.
-    auto allocation = (u8*)context.GetPatchHeap().TryAlloc(codeSize + count * 16 + 4);
+    // Test 119: parent-section patches are too far from secure BIOS wrappers.
+    // Only discover a second secure heap when mandatory patches used the
+    // disjoint parent section. Never rediscover already allocated secure space.
+    PatchHeap nearbyHeap;
+    PatchHeap* waitHeap = &context.GetPatchHeap();
+    if (patchesInParent)
+    {
+        const u32 secureStart = header->arm9LoadAddress;
+        if (!((u64)secureStart + 0x800 <= 0x02001000 || secureStart >= 0x02003000))
+            return;
+        SecureSysCallsUnusedSpaceLocator().FindUnusedSpace(header, nearbyHeap);
+        waitHeap = &nearbyHeap;
+    }
+    auto allocation = (u8*)waitHeap->TryAlloc(codeSize + count * 16 + 4);
     auto block = (u8*)(((u32)allocation + 3) & ~3u);
     if (!allocation)
         return;
@@ -242,6 +255,7 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     };
     PatchCollection patchCollection;
     OSResetSystemPatch* osResetSystemPatch = nullptr;
+    bool patchesInParent = false;
     if (sdkVersion != 0)
     {
         if (*(vu32*)0x02FFF00C == GAMECODE("ADAJ") &&
@@ -266,6 +280,7 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
                 patchContext.GetPatchHeap().AddFreeSpace(
                     (void*)(PARENT_SECTION_END - REQUIRED_PATCH_HEAP_SPACE),
                     REQUIRED_PATCH_HEAP_SPACE);
+                patchesInParent = true;
                 LOG_DEBUG("Placing patches in .parent section\n");
             }
             else
@@ -313,7 +328,7 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     }
     if (sdkVersion != 0 && !sdkVersion.IsTwlSdk())
     {
-        installRetailWaitHooks(patchContext, romHeader);
+        installRetailWaitHooks(patchContext, romHeader, patchesInParent);
         ErrorDisplay().PrintPatchSpaceDiagnostic(
             retailReturnHeapBeforeTotal,
             retailReturnHeapBeforeLargest,
