@@ -780,3 +780,270 @@ Hardware pending: Burnout first, photograph mode, A, verify boot/gameplay.
 Mode2 intentionally has no hotkey return. Check other previously failing games,
 and Mario Kart mode1 with gameplay/hotkey/Pico/relaunch regression test.
 Deliver DSPico_Test_125.zip; replace only picoLoader7.bin and picoLoader9.bin.
+
+## Hardware Test 125 and continuation review — October 6
+
+User confirms the tested game boots in RETURN MODE 2 and the hotkey does
+nothing, as designed. Conversation identifies the tested game as Burnout;
+the earlier allocation-failure photo alone did not identify its title.
+No Test 126 implementation or compilation has been completed.
+
+Continuation constraints:
+- Keep Test123 commit 3be3eb4 as the Mario Kart immediate-return baseline.
+- Keep Test125 commit d4c5248 as the compact boot-compatible baseline.
+- Do not repeat IRQ/vector/dispatcher rewrites, ARM7-only reboot experiments,
+  mailbox diagnostics, full-transfer probes or BIOS-wrapper searches without
+  new evidence. Earlier ARM9 approaches exist in Git history; hardware outcomes
+  before79 are not fully recorded in this log.
+- Preserve explicit Slot-1 ownership, VRAM mapping, ARM7 mode/stacks, real DLDI
+  preservation, bounded complete launcher path and paired-loader IPC protocol.
+- Preserve full ARM7 checksum constants unless the on-disk ARM7 changes; then
+  recompute size, word/sector counts and checksum before delivery.
+- Fragmented allocation must fit each piece, not just aggregate capacity.
+  The132-byte idle checker plus alignment also exceeds a124-byte maximum;
+  splitting only the552-byte CARDi payload is insufficient for immediate exit.
+- Optional failure must preserve game boot. Plan/copy all pieces before
+  publishing game branches or enabling ARM7 return.
+- Test count means installed hooks, not runtime reachability. Mario Kart123
+  establishes reachability; other games require separate hardware evidence.
+- Test125 does not establish restored compatibility for Pokemon Platinum,
+  NFS Undercover or Mega Man ZX. Recheck separately after Burnout.
+- Repository CI uses skylyrac/blocksds:slim-v1.20.0, libtwl submodule pinned to
+  55ffbc9e45b27d44cfee4404caac5fda19d4b8cc and .NET9 for data tables.
+  Numbered test builds must retain commit/run provenance and binary hashes.
+
+## Test 126: fragmented CARDi return, cartridge-read trigger first
+
+Test125 Burnout boots in mode2 with no return. Preserve the original552-byte
+full template for Mario Kart mode1. If full allocation fails, try an atomic
+seven-piece aligned plan: read92, acknowledgement92, park80, load96, check56,
+parameters68, extent table40 bytes, each plus3 bytes alignment allowance.
+All five executable pieces have local PC-relative literals and absolute
+inter-piece BX/BLX links; no short branch crosses allocations. On plan failure
+restore the exact heap linked-list state and choose the88-byte mode2 fallback.
+Mode3 uses complete nonempty launcher paths up to63 characters, otherwise
+fallback; mode1 retains127-character capacity. ARM7 header copy receives16
+path words in mode3 and32 in mode1; disk-header trailing path bytes stay zero.
+Preserve real DLDI16KiB reservation and checksum/ownership/startup machinery.
+Mode3 deliberately leaves optional idle helper disabled: first prove the
+fragmented complete return on the next CARDi CPU read, then fit idle checker.
+Mario Kart mode1 retains its original full template and immediate idle hook.
+
+Local build uses compiler/sysroot extracted from CI's BlocksDS slim-v1.20.0
+image, make loader9 loader7 with BLOCKSDS=/opt/wonderful/thirdparty/blocksds/core
+and BLOCKSDSEXT=/opt/wonderful/thirdparty/blocksds/external. No arm7 source edit.
+Local rebuilt ARM7 differs from uploaded125, so delivered7 is the exact original
+125 binary, not the locally rebuilt7:48480 bytes,sum0x0E2D6140,SHA256
+4b0106ddc8a853d5843f022aacc71e618131234ddfb86cdbad43b47a2f2d5b31.
+This explicitly preserves matching embedded checksum/size instead of claiming
+local toolchain reproduces the prior build byte for byte.
+Checks: compile succeeded; original552-byte full template exists byte-for-byte
+in uploaded125 ARM9; host execution of real PatchHeap allocation code verifies
+fragmentation/alignment/rollback and subsequent allocations after failure.
+Unicorn execution with mocked SD/ARM7 verifies normal return result/registers/
+stack and request ack,VRAM C/D,Slot1 handoffs,loader-sector read,entry validation,
+brightness restore and entry jump across scattered code blocks. This is not
+physical DS validation or proof that every game reaches CARDi CPU reads.
+
+Hardware pending: Burnout first, photograph MODE/MAX then A,verify boot/play.
+MODE3: hold hotkey then load next race/event; verify Pico games/navigation and
+relaunch. MODE2: fallback still boot-only; report rather than expecting exit.
+Then Mario Kart regression: immediate hotkey from menu,usable Pico,relaunch.
+Deliver DSPico_Test_126.zip; replace only picoLoader7.bin and picoLoader9.bin.
+
+Hardware Test126 October6: photo MODE3,BEFORE MAX124,AFTER TOTAL915,
+all optional hook counts0. User reports game does not boot, white screens
+after proceeding. Allocation succeeded; actual retail boot failed. Do not
+claim fragmented allocation is itself a functional return.
+
+## Test127: isolate newly enabled ARM7 detector from split ARM9 read path
+
+Keep all126 split ARM9 pieces,SDK field adaptations,path data,and exact on-disk
+ARM7 binary. Keep16KiB DLDI arena reservation and driver copy. Change split mode
+from3 to4 and skip only RetailHotkeyDetectionPatch on that path. Full mode1
+Mario Kart remains unchanged, including its detector and immediate idle hook.
+Mode4 is a diagnostic, not a completed return: the split read code runs but
+no ARM7 detector publishes a hotkey request.
+If Burnout mode4 boots, the omitted detector integration is implicated as a
+sufficient difference, not a diagnosis of its internal failure. If white
+screens persist, detector omission is not sufficient; investigate split read
+code and retained arena reservation independently. Never remove multiple
+components simultaneously and call that isolation.
+Hardware pending: photograph MODE,press A,check Burnout boot and gameplay.
+Do not expect hotkey exit in mode4. Mario Kart mode1 regression may verify
+boot,immediate exit,usable Pico and relaunch.
+Deliver DSPico_Test_127.zip,replace only both loader binaries.
+
+Hardware127 October6: MODE4,BEFORE MAX124,AFTER TOTAL915,all optional
+hook counts0. User presses A; game does not boot,white screens. Removing
+ARM7 detector alone was insufficient. Do not blame the detector as sole cause.
+
+## Test128: stock read epilogue with identical fragmented allocation layout
+
+Keep127 seven-piece sizes,locations,copying,and16KiB driver reservation.
+Replace only split read epilogue's LDR/BX to acknowledgement with original
+POP {r1,r2,r3,r4,r6,pc} plus same-size NOP. No-request cartridge reads now
+return directly with stock instruction semantics. Acknowledgement/park/load
+pieces still allocate/copy but are unreachable; heap consumption unchanged.
+Split mode5,no ARM7 detector,no idle hooks,no hotkey return. Mode1 unchanged.
+If boot succeeds,added IPC/ack execution is implicated; if it still fails,
+that execution is not sufficient explanation and layout/reservation remain.
+Compile and verify read section stays92 bytes,all other split pieces unchanged
+from127,original ARM7 binary reused. Hardware pending: Burnout mode5 photo,A,
+boot/gameplay. Deliver DSPico_Test_128.zip; copy only both loader bins.
+
+Hardware128 October6: MODE5,BEFORE MAX124,AFTER TOTAL915,optional counts0.
+User confirms still freezes,white screens after A. Removing acknowledgement
+execution with stock epilogue did not restore boot.
+
+## Test129: remove only extra DLDI reservation from split diagnostic path
+
+Keep128 split read template,stock epilogue,seven allocations and inactive
+return pieces. ARM7 detector remains disabled. Change diagnostic split mode
+to6 and omit16KiB extra DLDI reservation/copy for that mode. Ordinary ARM7
+patch/save arena reservations remain. Mario Kart mode1 still reserves DLDI
+and retains full return.
+If Burnout boots,extra reservation/driver-copy integration is implicated,
+not proof of a particular memory overwrite. If still white,investigate
+split allocation layout and actual SDK read invocation next.
+Hardware pending: mode6 photo,A,boot/gameplay. No hotkey return in mode6.
+Deliver DSPico_Test_129.zip; replace only both loader binaries.
+
+Hardware129 October6: photo MODE6,BEFORE MAX124,AFTER TOTAL915,all optional
+hooks0;user confirms white screens/no boot. Omitted extra driver reservation
+does not suffice. ARM7 detector,ack execution and extra DLDI reservation
+have each been disabled without restoring boot on split layout.
+
+## Test130: preserve alignment of heap remainders after split allocations
+
+Source review found TryAllocPieces reserved size+3 bytes even though fragment
+sizes are multiples of4. Aligned outputs did not keep each remainder aligned:
+subsequent ordinary Alloc could return an unaligned shared ARM9 patch routine.
+The earlier host test checked new piece alignment but not later allocations;
+that test coverage was insufficient. Hardware root cause still requires a pass.
+Reserve roundUp4(size+4) instead,keeping aligned initial blocks' remainders
+word aligned while covering up to3 bytes initial padding. Preserve rollback.
+Keep129 stock split read epilogue,no ARM7 detector,no extra driver reservation.
+Only allocator rounding and displayed mode/label change;mode7. Expected
+AFTER TOTAL908 vs915 due to one extra byte in each of7 reservations.
+Full mode1 untouched. A separate exact125-source local worktree was built
+for compiler review but is not the delivered130 experiment;do not confuse it
+with the alignment-fix test or claim a hardware result for it.
+Host checks must verify subsequent ordinary allocations too,in addition to
+piece bounds,nonoverlap and failed transaction restoration.
+Hardware pending: Burnout mode7 photo,A,boot/gameplay,no hotkey expected.
+If passes,re-enable actual fragmented return in next numbered test.
+Deliver DSPico_Test_130.zip;replace only both loader binaries.
+
+Hardware130 October6: photo MODE7,BEFORE MAX124,AFTER TOTAL908,optional
+hooks0. User confirms game booted. Aligned remainder allocation restores
+boot of stripped split diagnostic;actual return still untested after fix.
+
+## Test131: restore Test126 full fragmented return with corrected alignment
+
+Restore126 split read LDR/BX acknowledgement,mode3,ARM7 hotkey detector and
+16KiB real DLDI reservation/header handoff. Keep130 fixed allocator. All split
+executable sections must match126 byte-for-byte. Same bounded64-byte split
+path,extents/checks,original ARM7 binary,SDK adaptations. No idle helper in
+mode3. Mode1 Mario Kart remains original full return and idle trigger.
+This directly tests126's failed complete setup with alignment corrected.
+Expected Burnout MODE3,BEFORE MAX124,AFTER TOTAL908,A,normal boot,hotkey then
+next race/event CPU read,usable Pico,game relaunch. Request may wait if current
+scene uses another read path;do not treat installed mode as proven reachability.
+No claim of immediate menu exit or broad compatibility.
+Deliver DSPico_Test_131.zip;replace only both loader binaries.
+
+Hardware131 October6: photo MODE3,BEFORE MAX124,AFTER TOTAL908,all optional
+THUMB/ARM/HALT hook counts0. User confirms game boots,hotkey exits to Pico,
+relaunch succeeds and second exit cycle succeeds. Conversation identifies
+tested game as Burnout. Full fragmented-return cycle confirmed twice.
+User did not explicitly say whether a new race/event was loaded after hotkey;
+do not infer immediate idle-hook behavior. Hooks disabled;available trigger
+is CARDi CPU-read completion,which may run during current scene.
+Preserve DSPico_Test_131.zip as hardware-passing fragmented-return baseline.
+Alignment correction fixes the tested complete126 configuration as well as
+130 stripped configuration;no need to repeat127-129 disabled-component tests.
+Next validate131 on previously failing Pokemon Platinum,NFS Undercover,
+Mega Man ZX,plus Mario Kart immediate-return regression. Record game/revision,
+mode,boot,scene at hotkey,need for next load,usable Pico and repeated relaunch.
+Only pursue split idle helper if reachability/response delay requires it;
+no assumption that Burnout needs another trigger after this successful report.
+
+Hardware131 clarification October6: user explicitly had to load into gameplay
+after hotkey before exit. Burnout direct menu exit remains unresolved.
+
+## Test132: optional fragmented idle checker for split return mode3
+
+Keep hardware-passing131 split read/return,DLDI preservation,detector,loader
+images,and fixed aligned allocator. Publish mode3's acknowledged takeover
+and CP15-fix addresses. Install existing recognized BIOS wait/CP15-idle stubs
+using a new two-piece checker only in mode3. Probe piece checks system-mode
+context,IPC requestE and ROMCTRL busy;absolute LDR PC links reach separate
+resume/request piece. No-request resume restores CPSR flags,registers,SP/LR
+exactly. On request disables IME,fixesCP15,creates existing CARDi stack shape,
+then enters131's split acknowledgement. No IRQ/vector rewrites.
+Pieces allocate atomically through corrected TryAllocPieces;failure preserves
+131 read-triggered fallback. Mode1 uses unchanged123/131 contiguous helper.
+Hook counts establish installation,not reachability;HALT0 may still leave
+BIOS hooks installed yet unused during Burnout menus. No promise of timing.
+Hardware pending: Burnout photograph THUMB/ARM/HALT counts,A,verify boot,
+hotkey while navigating menus to avoid auto-loading,immediate Pico/relaunch.
+If unchanged,load next race/event to verify131 fallback. Mario Kart regression.
+Deliver DSPico_Test_132.zip;replace only both loader binaries.
+
+Test132 validation: local compiler restored from BlocksDS slim-v1.20.0.
+Probe84 and resume64 bytes;each plus4 allocator allowance fits124 bytes.
+Unicorn executes actual built/scattered sections: no request,busy card,IRQ
+and SVC defer and restore all saved registers,SP,LR,condition flags;system
+request reaches takeover via CP15-fix stub and disables IME. Mocked dispatch
+is not full SD/hardware validation. All131 full/split return,detector and
+Mario Kart helper sections found byte-for-byte in compiled132 ARM9. Original
+131 ARM7 reused. ZIP integrity and binary identity checks pass.
+
+Hardware132 October6: user reports 'that worked,right back to menu' after
+requested Burnout menu hotkey without loading gameplay. Immediate return
+confirmed by report;no hook-count photograph or repeated relaunch result
+supplied for132.131 previously passed delayed exit/relaunch twice. Keep
+132 numbered ZIP as immediate Burnout baseline;do not claim all-game support.
+
+## Test133: normal successful boot for broader compatibility checks
+
+Preserve132 return templates,split helper,installers,detector,DLDI and aligned
+allocator. Remove only successful preboot PrintPatchSpaceDiagnostic call after
+optional hooks. The mandatory-allocation failure renderer inside PatchHeap::Alloc
+remains with133 label. Normal launches no longer pause for A. No change in
+installed game code,allocation or trigger behavior. Exact source section
+comparison against132 required;delivered ARM7 remains original verified125.
+Test Burnout immediate menu exit and relaunch,repeated twice;Mario Kart menu
+exit/relaunch;then Pokemon Platinum,NFS Undercover,Mega Man ZX. For each record
+boot,menu vs gameplay hotkey,response delay,usable Pico and relaunch. If no
+menu response,trigger loading to check read fallback. Save/game progression
+not yet explicitly validated;observe ordinary save behavior during gameplay.
+If ALLOC FAIL appears,photograph CPU stage/needed/free counts. If white before
+UI or unsupported return,record separately. No silent assumption that SDK5
+or DMA-only game return is covered by SDK2-4 CARDi path.
+Deliver DSPico_Test_133.zip;replace only both loader binaries.
+
+Test133 compile passed;all10 return/detector/wait-helper sections match132
+byte-for-byte. Successful diagnostic call removed;failure renderer retained.
+Original ARM7 reused,ZIP integrity checked. Hardware pending.
+
+
+## Test 133 cross-game results / Test 134
+User reports Burnout and NFS work; Mega Man ZX requires entering gameplay before returning to Pico. Contra 4 and Pokemon Platinum both stop at ARM9 allocation failure: needed 368, total 888, largest 124. Test 134 reserves the legacy OS_ResetSystem loader info and two code blocks atomically with nonfatal TryAllocPieces; if unavailable, leaves native OS_ResetSystem unmodified. The independent hotkey path is unchanged. Hardware validation pending.
+
+
+## Test 134 result / Test 135
+Pokemon Platinum works according to user. Contra 4 boots, but an in-game hotkey attempt fails to return and produces corrupted graphics (photo). Exact stalled stage is unknown. Test 135 stops all four ARM9 DMA channels only on the confirmed split return acknowledgement, before VRAM C/D remapping. Hypothesis: ongoing game DMA writes during takeover; not yet proven. Native reset allocation fallback from 134 retained. Hardware validation pending.
+
+
+## Test 135 result / Test 136
+Contra 4: hotkey in menu appears unresponsive, then entering gameplay freezes black; in gameplay hotkey again causes graphics corruption. DMA quiescence did not resolve reported failure. Test 136 removes pre-request ARM7 SD loader probe so no loader SD reads happen until ARM9 acknowledges and grants card ownership. Full post-ack read, checksum and staged checksum remain. ARM9 DMA fix and Test 134 reset allocation fallback retained. Hardware result pending.
+
+
+## Test 136 result / Test 137 checkpoint
+User confirmed Contra 4 hotkey during gameplay exits to Pico. Menu hotkey behavior, Pico usability and relaunch not yet confirmed for 136; Pokemon regression not yet reported. Test 137 preserves 136 functional code, updates diagnostic build label only, and packages cross-game validation checkpoint.
+
+
+## Hardware milestone: broad game return confirmed (2026-10-06)
+User additionally confirmed Contra 4 return from its menu, following its gameplay return confirmation. User then reported testing approximately every game currently loaded and all exited to Pico as desired. Exact game list, per-game menu/gameplay timing, and repeated relaunch coverage were not supplied. This is broad success on the tested collection, not a claim of universal compatibility. Builds 136 and 137 have identical functional return templates; 137 changes the diagnostic label only. Preserve Test 137 as the working baseline. No further functional changes made after this report.

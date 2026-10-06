@@ -128,3 +128,25 @@ void* PatchHeap::TryAlloc(u32 size)
 
     return result;
 }
+
+
+bool PatchHeap::TryAllocPieces(const u32* sizes, void** outputs, u32 count)
+{
+    const auto blocks = _blocks;
+    auto freeBlocks = _freeBlocks;
+    auto unusedBlocks = _unusedBlockPool;
+    for (u32 i = 0; i < count; ++i)
+    {
+        auto raw = (u8*)TryAlloc((sizes[i] + 7) & ~3u);
+        if (!raw)
+        {
+            _blocks = blocks;
+            _freeBlocks = freeBlocks;
+            _unusedBlockPool = unusedBlocks;
+            for (u32 j = 0; j < count; ++j) outputs[j] = nullptr;
+            return false;
+        }
+        outputs[i] = (void*)(((u32)raw + 3) & ~3u);
+    }
+    return true;
+}

@@ -21,6 +21,8 @@
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 #include "Arm7Patcher.h"
 extern u32 retailReturnCardiMode;
+extern u32 retailReturnSplitPathWords;
+extern "C" u32 patch_retailhotkeydetect_pathWords;
 
 static u32 correctAddress(u32 address, const nds_header_ntr_t* romHeader)
 {
@@ -39,6 +41,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
 {
     cheatsPtr = nullptr;
     patch_retailhotkeydetect_dldiAddress = 0;
+    patch_retailhotkeydetect_pathWords = retailReturnSplitPathWords;
     auto romHeader = (const nds_header_ntr_t*)TWL_SHARED_MEMORY->ntrSharedMem.romHeader;
     auto twlRomHeader = (const nds_header_twl_t*)TWL_SHARED_MEMORY->twlRomHeader;
     ModuleParamsLocator moduleParamsLocator;
@@ -90,7 +93,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         void* privateWramHeapStart = arm7ArenaPatch->GetArm7PrivateWramArenaLo();
         u32 mainMemoryArenaLo = (u32)arm7ArenaPatch->GetMainMemoryArenaLo();
         // Test 109: reserve persistent game-excluded storage for the real driver.
-        if (cheatsLength == 0 && retailReturnCardiMode == 1)
+        if (cheatsLength == 0 && (retailReturnCardiMode == 1 || retailReturnCardiMode == 3))
         {
             patch_retailhotkeydetect_dldiAddress = correctAddress(mainMemoryArenaLo, romHeader);
             mainMemoryArenaLo += 16 * 1024;
@@ -118,7 +121,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
             patchCollection.AddPatch(new CheatEnginePatch(cheats));
             mainMemoryArenaLo += cheatsLength;
         }
-        else if (retailReturnCardiMode == 1)
+        else if (retailReturnCardiMode == 1 || retailReturnCardiMode == 3)
         {
             patchCollection.AddPatch(new RetailHotkeyDetectionPatch());
         }

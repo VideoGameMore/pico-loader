@@ -67,6 +67,18 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
     if (!_osResetSystem)
         return;
 
+    // The hotkey return path is independent of this legacy reset redirect.
+    // Reserve its three blocks together; fragmentation must not prevent boot
+    // or leave a partially installed reset patch.
+    const u32 sizes[] = { sizeof(loader_info_t),
+        SECTION_SIZE(patch_osresetsystem_boot), SECTION_SIZE(patch_osresetsystem) };
+    void* targets[3];
+    if (!patchContext.GetPatchHeap().TryAllocPieces(sizes, targets, 3))
+    {
+        LOG_DEBUG("Skipping optional OS_ResetSystem redirect: insufficient contiguous patch space\n");
+        return;
+    }
+
     u32 offset;
     if (patchContext.GetSdkVersion().IsTwlSdk())
     {
@@ -89,16 +101,16 @@ void OSResetSystemPatch::ApplyPatch(PatchContext& patchContext)
         patch_osresetsystem_entry_jump_to_twl_arm7_sync = THUMB_NOP;
     }
 
-    auto loaderInfoTarget = (loader_info_t*)patchContext.GetPatchHeap().Alloc(sizeof(loader_info_t));
+    auto loaderInfoTarget = (loader_info_t*)targets[0];
     memcpy(loaderInfoTarget, _loaderInfo, sizeof(loader_info_t));
 
     auto sdReadPatchCode = patchContext.GetLoaderPlatform()->CreateSdReadPatchCode(
         patchContext.GetPatchCodeCollection(), patchContext.GetPatchHeap());
     auto patchCodePart2 = patchContext.GetPatchCodeCollection().AddUniquePatchCode<OSResetSystemPart2PatchCode>(
-        patchContext.GetPatchHeap());
+        targets[1]);
     auto patchCode = patchContext.GetPatchCodeCollection().AddUniquePatchCode<OSResetSystemPatchCode>
     (
-        patchContext.GetPatchHeap(),
+        targets[2],
         loaderInfoTarget,
         sdReadPatchCode,
         patchCodePart2

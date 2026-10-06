@@ -40,6 +40,17 @@ extern u32 retailReturnHeapBeforeLargest;
 
 
 DEFINE_SECTION_SYMBOLS(patch_retailreturnwait);
+DEFINE_SECTION_SYMBOLS(patch_waitsplit_probe);
+DEFINE_SECTION_SYMBOLS(patch_waitsplit_resume);
+extern u32 retailReturnCardiMode;
+extern "C" void waitSplitProbeEntry();
+extern "C" void waitSplitRequestEntry();
+extern "C" void waitSplitReturnEntry();
+extern "C" u32 waitSplitRequestAddress;
+extern "C" u32 waitSplitReturnAddress;
+extern "C" u32 waitSplitFix;
+extern "C" u32 waitSplitTakeover;
+
 extern "C" void patch_retailreturnwait_entry();
 extern "C" u32 patch_retailreturnwait_fix;
 extern "C" u32 patch_retailreturnwait_takeover;
@@ -166,15 +177,37 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
     }
     // Keep ARM checker in the proven heap; only small Thumb stubs need proximity.
     retailReturnWaitState = 5;
-    auto allocation = (u8*)context.GetPatchHeap().TryAlloc(codeSize + 4);
-    if (!allocation)
-        return;
-    auto block = (u8*)(((u32)allocation + 3) & ~3u);
-    patch_retailreturnwait_fix = retailReturnFixAddress;
-    patch_retailreturnwait_takeover = retailReturnTakeoverAddress;
-    memcpy(block, SECTION_START(patch_retailreturnwait), SECTION_SIZE(patch_retailreturnwait));
-    u32 entry = (u32)block + (u32)patch_retailreturnwait_entry -
-        (u32)SECTION_START(patch_retailreturnwait);
+    u32 entry = 0;
+    if (retailReturnCardiMode == 3)
+    {
+        const u32 sizes[] = { SECTION_SIZE(patch_waitsplit_probe), SECTION_SIZE(patch_waitsplit_resume) };
+        void* pieces[2] = {};
+        if (!context.GetPatchHeap().TryAllocPieces(sizes, pieces, 2))
+            return;
+        waitSplitRequestAddress = (u32)pieces[1] + (u32)waitSplitRequestEntry -
+            (u32)SECTION_START(patch_waitsplit_resume);
+        waitSplitReturnAddress = (u32)pieces[1] + (u32)waitSplitReturnEntry -
+            (u32)SECTION_START(patch_waitsplit_resume);
+        waitSplitFix = retailReturnFixAddress;
+        waitSplitTakeover = retailReturnTakeoverAddress;
+        memcpy(pieces[0], SECTION_START(patch_waitsplit_probe), sizes[0]);
+        memcpy(pieces[1], SECTION_START(patch_waitsplit_resume), sizes[1]);
+        entry = (u32)pieces[0] + (u32)waitSplitProbeEntry -
+            (u32)SECTION_START(patch_waitsplit_probe);
+    }
+    else
+    {
+        // Preserve the hardware-passing Mario Kart helper and layout.
+        auto allocation = (u8*)context.GetPatchHeap().TryAlloc(codeSize + 4);
+        if (!allocation)
+            return;
+        auto block = (u8*)(((u32)allocation + 3) & ~3u);
+        patch_retailreturnwait_fix = retailReturnFixAddress;
+        patch_retailreturnwait_takeover = retailReturnTakeoverAddress;
+        memcpy(block, SECTION_START(patch_retailreturnwait), SECTION_SIZE(patch_retailreturnwait));
+        entry = (u32)block + (u32)patch_retailreturnwait_entry -
+            (u32)SECTION_START(patch_retailreturnwait);
+    }
     u16* stubs[4] = {};
     retailReturnWaitState = 6;
     for (u32 i = 0; i < count; ++i)
@@ -477,11 +510,7 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     if (sdkVersion != 0 && !sdkVersion.IsTwlSdk())
     {
         installRetailWaitHooks(patchContext, romHeader, patchesInParent, arm9Size);
-        ErrorDisplay().PrintPatchSpaceDiagnostic(
-            retailReturnHeapBeforeTotal,
-            retailReturnHeapBeforeLargest,
-            patchContext.GetPatchHeap().GetFreeBytes(),
-            patchContext.GetPatchHeap().GetLargestFreeBlock());
+        // Test133: successful launches proceed normally; allocation-failure diagnostics remain.
     }
     dc_flushAll();
     dc_drainWriteBuffer();

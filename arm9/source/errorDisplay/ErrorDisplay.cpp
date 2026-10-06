@@ -186,7 +186,7 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
     fastClear((void*)GFX_BG_MAIN, 0x10000);
     if (retailReturnFailedAllocation)
     {
-        drawPatchText("TEST 125 ALLOC FAIL", 8, 4);
+        drawPatchText("TEST 137 ALLOC FAIL", 8, 4);
         drawPatchValue("CPU STAGE ", retailReturnPatchStage, 28);
         drawPatchValue("NEEDED ", retailReturnFailedAllocation, 52);
         drawPatchValue("FREE TOTAL ", afterTotal, 76);
@@ -195,7 +195,7 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
     }
     else
     {
-        drawPatchText("TEST 125 BOOT MODE", 8, 4);
+        drawPatchText("TEST 137 BOOT MODE", 8, 4);
         drawPatchValue("RETURN MODE ", retailReturnCardiMode, 24);
         drawPatchValue("BEFORE MAX ", retailReturnHeapBeforeLargest, 44);
         drawPatchValue("AFTER TOTAL ", afterTotal, 64);

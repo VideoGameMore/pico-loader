@@ -1,4 +1,7 @@
 # Pico Loader
+
+This is VideoGameMore's fork of [LNH-team/Pico Loader](https://github.com/LNH-team/pico-loader). Credit for the original loader belongs to its upstream authors and contributors. Our DSPico retail return-hotkey work is described in [Build 137 notes](docs/build-137-release.md).
+
 Pico Loader is a homebrew and retail DS(i) rom loader supporting a variety of platforms (see below).
 
 ## Features
@@ -14,7 +17,7 @@ Pico Loader is a homebrew and retail DS(i) rom loader supporting a variety of pl
 
 Note that Pico Loader can currently not run retail roms from the DSi SD card. Homebrew is supported, however.
 
-Return to loader is also currently not supported in retail games yet.
+This VideoGameMore DSPico fork supports retail-game return with **L + R + Down + Select**. See [Build 137 installation and technical notes](docs/build-137-release.md). This return implementation is hardware-tested on DSPico; other flashcard platforms are not validated.
 
 ## Supported platforms
 

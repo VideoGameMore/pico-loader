@@ -118,11 +118,9 @@ check_hotkey:
     movs r3, #1
     str r3, [r2]
 
-    // Test 99: keep full-file checksum; request ARM9 acknowledgement.
-    // Audio stays enabled until ARM9 replies on a later invocation.
-    bl patch_retailhotkeydetect_dspico_loader_probe
-    cmp r0, #0
-    beq detection_done
+    // Test 136: request ownership before any loader SD reads. The game
+    // may still be using the card here. Full read/checksum verification
+    // remains in the post-ack path after ARM9 grants ownership.
 
     // Preserve IPC control/IRQ bits; change only ARM7's outgoing nibble.
     ldr r2, regIpcSync
@@ -260,7 +258,7 @@ setup_launcher_header:
     beq launcher_params_bad
     ldr r4, launcherRomPath
     ldr r5, launcherReturnPath
-    movs r1, #32 // Test 116: compact path; fresh disk header remainder stays zero
+    ldr r1, patch_retailhotkeydetect_pathWords // full=32, split=16; header tail remains zero
 launcher_copy_path:
     ldr r3, [r2]
     str r3, [r4]
@@ -278,6 +276,9 @@ launcher_params_bad:
     movs r0, #0
     bx lr
 .balign 4
+.global patch_retailhotkeydetect_pathWords
+patch_retailhotkeydetect_pathWords:
+    .word 32
 .global patch_retailhotkeydetect_loaderParamsAddress
 patch_retailhotkeydetect_loaderParamsAddress:
     .word 0

@@ -21,8 +21,8 @@ extern u32 patch_osresetsystem_cheats_address;
 class OSResetSystemPart2PatchCode : public PatchCode
 {
 public:
-    explicit OSResetSystemPart2PatchCode(PatchHeap& patchHeap)
-        : PatchCode(SECTION_START(patch_osresetsystem_boot), SECTION_SIZE(patch_osresetsystem_boot), patchHeap)
+    explicit OSResetSystemPart2PatchCode(void* target)
+        : PatchCode(SECTION_START(patch_osresetsystem_boot), SECTION_SIZE(patch_osresetsystem_boot), target)
     {
     }
 
@@ -40,9 +40,9 @@ public:
 class OSResetSystemPatchCode : public PatchCode
 {
 public:
-    OSResetSystemPatchCode(PatchHeap& patchHeap, const loader_info_t* loaderInfo,
+    OSResetSystemPatchCode(void* target, const loader_info_t* loaderInfo,
         const IReadSectorsPatchCode* readSectorsPatchCode, const OSResetSystemPart2PatchCode* part2PatchCode)
-        : PatchCode(SECTION_START(patch_osresetsystem), SECTION_SIZE(patch_osresetsystem), patchHeap)
+        : PatchCode(SECTION_START(patch_osresetsystem), SECTION_SIZE(patch_osresetsystem), target)
     {
         patch_osresetsystem_loader_info_address = loaderInfo;
         patch_osresetsystem_readSdSectors_address = (u32)readSectorsPatchCode->GetReadSectorsFunction();
