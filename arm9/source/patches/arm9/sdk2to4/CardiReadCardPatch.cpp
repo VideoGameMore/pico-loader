@@ -11,6 +11,9 @@
 #include "CardiReadCardPatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 extern "C" u32 patch_cardireadcard_loaderParams[33];
+extern "C" void patch_cardireadcard_retail_entry();
+u32 retailReturnTakeoverAddress = 0;
+u32 retailReturnFixAddress = 0;
 u32 retailReturnHeapBeforeTotal = 0;
 u32 retailReturnHeapBeforeLargest = 0;
 
@@ -302,6 +305,10 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     patch_retailhotkeydetect_loaderParamsAddress =
         (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
         (u32)SECTION_START(patch_cardireadcard);
+    retailReturnTakeoverAddress = ((u32)patch1Address +
+        ((u32)patch_cardireadcard_retail_entry & ~1u) -
+        (u32)SECTION_START(patch_cardireadcard)) | 1u;
+    retailReturnFixAddress = __patch_cardireadcard_fix_cp15_asm_address;
     memcpy(patch1Address, SECTION_START(patch_cardireadcard), patch1Size);
     memcpy(patch4Address, SECTION_START(fixcp15), patch4Size);
 }

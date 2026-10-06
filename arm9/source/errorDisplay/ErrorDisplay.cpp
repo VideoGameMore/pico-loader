@@ -1,4 +1,5 @@
 #include "common.h"
+extern u32 retailReturnWaitHookCount;
 #include <libtwl/mem/memVram.h>
 #include <libtwl/gfx/gfx.h>
 #include <libtwl/gfx/gfxStatus.h>
@@ -170,13 +171,14 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
     fastClear((void*)GFX_BG_MAIN, 0x10000);
-    drawPatchText("TEST 116 PATCH SPACE", 8, 4);
+    drawPatchText("TEST 117 PATCH SPACE", 8, 4);
     drawPatchValue("BEFORE TOTAL ", beforeTotal, 28);
     drawPatchValue("BEFORE MAX ", beforeLargest, 48);
     drawPatchValue("AFTER TOTAL ", afterTotal, 68);
     drawPatchValue("AFTER MAX ", afterLargest, 88);
     drawPatchValue("BASE PATCH ", 552, 116);
-    drawPatchText("PHOTO THEN PRESS A", 8, 148);
+    drawPatchValue("WAIT HOOKS ", retailReturnWaitHookCount, 140);
+    drawPatchText("PHOTO THEN PRESS A", 8, 168);
 
     waitForVBlank();
     GFX_PLTT_BG_MAIN[0] = 0;

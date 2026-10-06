@@ -528,6 +528,24 @@ with invalid parameters. Ordinary game reads and the working loader/DLDI
 handoff remain unchanged. No new trigger is installed yet.
 Expected Mario Kart diagnostic: before total/max 1240, after total/max 204,
 base patch 552. Photograph counts, press A, then verify the same hotkey plus
-race load, usable Pico menu and successful relaunch. Hardware pending.
+race load, usable Pico menu and successful relaunch. Hardware PASS October 5: diagnostic 1240/1240 before, 204/204 after, base 552; same working boot/return/relaunch.
 Both on-disk loaders still copied; ARM7 binary expected byte-identical to 109.
 Deliver DSPico_Test_116.zip.
+
+## Test 117: optional BIOS-wait trigger within measured capacity
+
+116 hardware passes and confirms 204 contiguous bytes free. Revisit the
+previously untested BIOS-wait trigger with the measured capacity available.
+Unlike 112, allocate its ARM checker plus up to four 16-byte Thumb stubs as
+ONE optional block only AFTER all required patches are copied. TryAlloc
+failure skips it without changing wrappers or preventing boot. Preflight every
+Thumb branch before publishing any hook. No IRQ dispatcher or IRQ return edits.
+Expose relocated existing CARDi takeover and CP15 fixer addresses without
+growing CARDi's 552-byte template. On no request checker restores registers
+and flags; stub restores BIOS arguments and executes original SVC. On E
+request, idle cartridge required, disable IME, run existing CP15 fix and enter
+existing return handshake. ARM7 binary unchanged; race-read fallback retained.
+Diagnostic adds WAIT HOOKS count; photograph before A. Verify boot then hotkey
+from a stationary game menu without loading a race. If no response, load a race
+to test fallback, then menu navigation and relaunch. Hook reachability and
+hardware behavior pending. Deliver DSPico_Test_117.zip, copy only both bins.

@@ -37,6 +37,72 @@ extern u32 retailReturnHeapBeforeLargest;
 #include "errorDisplay/ErrorDisplay.h"
 #include "Arm9Patcher.h"
 
+
+DEFINE_SECTION_SYMBOLS(patch_retailreturnwait);
+extern "C" void patch_retailreturnwait_entry();
+extern "C" u32 patch_retailreturnwait_fix;
+extern "C" u32 patch_retailreturnwait_takeover;
+extern u32 retailReturnTakeoverAddress;
+extern u32 retailReturnFixAddress;
+u32 retailReturnWaitHookCount = 0;
+
+static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header)
+{
+    retailReturnWaitHookCount = 0;
+    if (!retailReturnTakeoverAddress || !retailReturnFixAddress || header->arm9Size < 0x800)
+        return;
+    u16* sites[4] = {};
+    u32 count = 0;
+    auto secure = (u16*)header->arm9LoadAddress;
+    for (u32 i = 0; i + 1 < 0x800 / 2 && count < 4; ++i)
+    {
+        u16 svc = secure[i];
+        if (secure[i + 1] != 0x4770)
+            continue;
+        if (svc != 0xDF03 && svc != 0xDF04 && svc != 0xDF05 && svc != 0xDF06)
+            continue;
+        if ((svc == 0xDF04 || svc == 0xDF05) && (i == 0 || secure[i - 1] != 0x2200))
+            continue;
+        sites[count++] = &secure[i];
+    }
+    if (!count)
+        return;
+    const u32 codeSize = (SECTION_SIZE(patch_retailreturnwait) + 3) & ~3u;
+    // One optional allocation after all mandatory patches and copies.
+    // Failure leaves every BIOS wrapper untouched.
+    auto block = (u8*)context.GetPatchHeap().TryAlloc(codeSize + count * 16);
+    if (!block)
+        return;
+    for (u32 i = 0; i < count; ++i)
+    {
+        int delta = (int)(block + codeSize + i * 16) - (int)sites[i] - 4;
+        if ((delta & 1) || delta < -2048 || delta > 2046)
+            return; // no hook has been published
+    }
+    patch_retailreturnwait_fix = retailReturnFixAddress;
+    patch_retailreturnwait_takeover = retailReturnTakeoverAddress;
+    memcpy(block, SECTION_START(patch_retailreturnwait), SECTION_SIZE(patch_retailreturnwait));
+    u32 entry = (u32)block + (u32)patch_retailreturnwait_entry -
+        (u32)SECTION_START(patch_retailreturnwait);
+    for (u32 i = 0; i < count; ++i)
+    {
+        auto stub = (u16*)(block + codeSize + i * 16);
+        stub[0] = 0xB50F; // push r0-r3,lr
+        stub[1] = 0x4B02; // literal at stub+12
+        stub[2] = 0x4798; // blx r3
+        stub[3] = 0xBC0F; // restore BIOS arguments
+        stub[4] = *sites[i];
+        stub[5] = 0xBD00; // return to original caller
+        *(u32*)&stub[6] = entry;
+    }
+    for (u32 i = 0; i < count; ++i)
+    {
+        int delta = (int)(block + codeSize + i * 16) - (int)sites[i] - 4;
+        *sites[i] = 0xE000 | ((delta >> 1) & 0x7FF);
+    }
+    retailReturnWaitHookCount = count;
+}
+
 #define PARENT_SECTION_START    0x02001000
 #define PARENT_SECTION_END      0x02003000
 
@@ -239,6 +305,7 @@ Arm9Patcher::PatchResult Arm9Patcher::ApplyPatches(const LoaderPlatform* loaderP
     }
     if (sdkVersion != 0 && !sdkVersion.IsTwlSdk())
     {
+        installRetailWaitHooks(patchContext, romHeader);
         ErrorDisplay().PrintPatchSpaceDiagnostic(
             retailReturnHeapBeforeTotal,
             retailReturnHeapBeforeLargest,
