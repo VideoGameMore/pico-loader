@@ -716,3 +716,36 @@ Diagnostic HALT SITES is recognized instruction count; HALT HOOKS is installed
 count. Neither proves menu execution. Hardware pending: photo then A, game boot,
 hotkey while navigating menus, fallback race if needed, usable Pico and relaunch.
 Deliver DSPico_Test_123.zip; copy only picoLoader7.bin and picoLoader9.bin.
+
+Hardware Test 123 October 6: STATE8, nearby max128, parent after68,
+THUMB4, ARM0, HALT SITES1, HALT HOOKS1. Mario Kart boots and exits to usable
+Pico from menus with the hotkey alone, without a race/demo load. User repeats
+launch/exit/relaunch/exit successfully and then confirms gameplay and exit
+on command. Immediate trigger and full cycle confirmed on this game/setup.
+Compatibility failures on123: Burnout Legends, Pokemon Platinum, NFS Undercover,
+Mega Man ZX all fail to boot with white screens. User installs official
+unmodified Pico_Loader_DSPICO v1.7.1 loader pair (same other files) and confirms
+all four boot. Difference is established; specific modified component is not.
+Preserve original Test123 artifact and source as the Mario Kart working baseline.
+
+## Test 124: display mandatory allocation failures at the point of failure
+
+The modified CARDi template is552 bytes and PatchHeap::Alloc spins forever
+when no single free block fits. Mario Kart uses available clone-parent space;
+non-clone games can depend on fragmented secure-area space instead. This is a
+specific candidate for the four pre-boot failures, not yet their measured cause.
+Keep all123 game-patch code, ARM7 binary, CARDi552 and guarded132-byte idle helper.
+Do not disable hooks, relocate game memory or change required allocation behavior.
+Label ARM9 and ARM7 patch command stages9/7. If a mandatory Alloc fails, use the
+existing VRAM-safe direct diagnostic renderer to show CPU STAGE, NEEDED bytes,
+FREE TOTAL and FREE MAX from that exact heap before retaining the fatal wait.
+Error screen says PHOTO THEN REBOOT and does not pretend A can recover a
+mandatory failure. Optional TryAlloc failures still skip normally.
+Ordinary successful path shows TEST124 HALT INSTALL and waits for A as123 did.
+No new game allocations. Allocation instrumentation runs only on failure.
+Test Burnout first. Photograph ALLOC FAIL if shown; otherwise report whether the
+normal HALT INSTALL screen appears and whether pressing A boots. If it remains
+white before any readable diagnostic, allocation failure is not established
+by this test; investigate another stage. Then compare one other failing game.
+Mario Kart can verify123 hook behavior unchanged. Do not expect this diagnostic
+build to fix boot by itself. Deliver DSPico_Test_124.zip; replace only both bins.

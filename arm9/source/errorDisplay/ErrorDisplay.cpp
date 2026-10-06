@@ -1,4 +1,6 @@
 #include "common.h"
+extern u32 retailReturnPatchStage;
+extern u32 retailReturnFailedAllocation;
 extern u32 retailReturnWaitHookCount;
 extern u32 retailReturnArmWaitHookCount;
 extern u32 retailReturnAutoloadWaitHookCount;
@@ -180,15 +182,27 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
     fastClear((void*)GFX_BG_MAIN, 0x10000);
-    drawPatchText("TEST 123 HALT INSTALL", 8, 4);
-    drawPatchValue("STATE ", retailReturnWaitState, 24);
-    drawPatchValue("NEAR MAX ", retailReturnNearbyMax, 44);
-    drawPatchValue("AFTER TOTAL ", afterTotal, 64);
-    drawPatchValue("THUMB HOOKS ", retailReturnWaitHookCount, 84);
-    drawPatchValue("ARM HOOKS ", retailReturnArmWaitHookCount, 104);
-    drawPatchValue("HALT SITES ", retailReturnHaltSiteCount, 124);
-    drawPatchValue("HALT HOOKS ", retailReturnHaltHookCount, 144);
-    drawPatchText("PHOTO THEN PRESS A", 8, 168);
+    if (retailReturnFailedAllocation)
+    {
+        drawPatchText("TEST 124 ALLOC FAIL", 8, 4);
+        drawPatchValue("CPU STAGE ", retailReturnPatchStage, 28);
+        drawPatchValue("NEEDED ", retailReturnFailedAllocation, 52);
+        drawPatchValue("FREE TOTAL ", afterTotal, 76);
+        drawPatchValue("FREE MAX ", afterLargest, 100);
+        drawPatchText("PHOTO THEN REBOOT", 8, 156);
+    }
+    else
+    {
+        drawPatchText("TEST 124 HALT INSTALL", 8, 4);
+        drawPatchValue("STATE ", retailReturnWaitState, 24);
+        drawPatchValue("NEAR MAX ", retailReturnNearbyMax, 44);
+        drawPatchValue("AFTER TOTAL ", afterTotal, 64);
+        drawPatchValue("THUMB HOOKS ", retailReturnWaitHookCount, 84);
+        drawPatchValue("ARM HOOKS ", retailReturnArmWaitHookCount, 104);
+        drawPatchValue("HALT SITES ", retailReturnHaltSiteCount, 124);
+        drawPatchValue("HALT HOOKS ", retailReturnHaltHookCount, 144);
+        drawPatchText("PHOTO THEN PRESS A", 8, 168);
+    }
 
     waitForVBlank();
     GFX_PLTT_BG_MAIN[0] = 0;
@@ -206,6 +220,12 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
     GFX_PLTT_BG_SUB[0] = 0;
     REG_MASTER_BRIGHT_SUB = 0x8010;
     REG_DISPCNT_SUB = 0x10000;
+    if (retailReturnFailedAllocation)
+    {
+        // A cannot recover a failed mandatory patch. Keep the evidence visible.
+        while (true)
+            waitForVBlank();
+    }
     bool previousA = readAButton();
     do
     {

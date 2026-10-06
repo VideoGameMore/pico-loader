@@ -1,4 +1,6 @@
 #include "common.h"
+extern u32 retailReturnPatchStage;
+extern u32 retailReturnFailedAllocation;
 #include "ApList.h"
 #include <libtwl/gfx/gfx3d.h>
 #include <libtwl/gfx/gfx3dCmd.h>
@@ -137,6 +139,8 @@ static void handleClearMainMemCommand()
 
 static void handleApplyArm9PatchesCommand()
 {
+    retailReturnPatchStage = 9;
+    retailReturnFailedAllocation = 0;
     auto result = Arm9Patcher().ApplyPatches(
         sLoaderPlatform,
         sApListEntry.GetGameCode() == 0 ? nullptr : &sApListEntry,
@@ -149,6 +153,8 @@ static void handleApplyArm9PatchesCommand()
 
 static void handleApplyArm7PatchesCommand(u32 cheatsLength)
 {
+    retailReturnPatchStage = 7;
+    retailReturnFailedAllocation = 0;
     void* cheats = nullptr;
     char* bannerSavePath = nullptr;
     void* patchSpaceStart = Arm7Patcher().ApplyPatches(sLoaderPlatform, cheatsLength, cheats, bannerSavePath, sRunInDSiMode);

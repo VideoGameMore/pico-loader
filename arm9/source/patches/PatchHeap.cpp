@@ -1,5 +1,9 @@
 #include "common.h"
 #include "PatchHeap.h"
+#include "errorDisplay/ErrorDisplay.h"
+
+u32 retailReturnPatchStage = 0;
+u32 retailReturnFailedAllocation = 0;
 
 PatchHeap::PatchHeap()
     : _freeBlocks(nullptr)
@@ -68,7 +72,9 @@ void* PatchHeap::Alloc(u32 size)
     void* result = TryAlloc(size);
     if (!result)
     {
-        LOG_FATAL("No space found to put patch of size 0x%x\n", size);
+        retailReturnFailedAllocation = size;
+        // Show actual capacity at the required-allocation failure, before spinning.
+        ErrorDisplay().PrintPatchSpaceDiagnostic(0, 0, GetFreeBytes(), GetLargestFreeBlock());
         while (1);
     }
     return result;
