@@ -591,3 +591,44 @@ now be nearby and WAIT HOOKS should be nonzero; parent free count may remain
 Hardware pending: photograph, A, game boot, menu-only hotkey, Pico navigation
 and relaunch. Check race fallback if menu trigger has no response.
 Deliver DSPico_Test_119.zip, copy only picoLoader7.bin and picoLoader9.bin.
+
+Hardware Test 119 October 6: before 1240, after total/max 204, SITE/STUB 0,
+WAIT HOOKS 0. Game boots; hotkey alone does nothing; subsequent race load
+returns to Pico menu. Relaunch not separately reported in this result.
+Nearby installation exited before publishing branches; exact early check
+not measured. Main heap remains untouched by optional code.
+
+## Recap 110-119
+
+110/111: added IRQ paths fail game boot; execution not established.
+112: BIOS-wait experiment also fails boot before trigger can be tested.
+113: exact 109 binaries restore boot, usable Pico menu and relaunch.
+114: diagnostic waits invisibly; A boots game.
+115: readable diagnostic proves only 76 bytes remain after required patches.
+116: compact bounded launcher parameters recover 128 bytes; boot/return/relaunch pass.
+117: helper fits but zero hooks; boot and race fallback pass.
+118: zero hooks despite per-site checking; address measurement proves 10302-byte
+branch displacement, outside short Thumb branch range. Race fallback passes.
+119: nearby allocation attempt exits early; boot and race fallback pass.
+Known working: hotkey request, race-read acknowledgement, both loaders, storage,
+Pico menu and relaunch. Menu-only trigger remains uninstalled and unproven.
+Correction to early reasoning: Mario Kart uses .parent patch memory, while
+wait wrappers are in the separate secure area. Capacity counts described the
+parent heap; they were not measurements of secure-area free capacity.
+
+## Test 120: split nearby stubs from helper; expose installer state
+
+Keep the 120-byte ARM checker in the proven required-patch heap (optional
+124-byte aligned reservation). Allocate each 16-byte Thumb stub separately
+with 20-byte aligned reservations from nearby secure space when mandatory
+patches use disjoint parent memory. This avoids requiring a single nearby
+188-byte block. Nonfatal allocation and individual branch checks retained.
+Diagnostic STATE codes: 1 missing takeover/fixer or short image; 2 no wait
+sites; 3 secure/parent overlap; 4 nearby heap empty; 5 helper allocation fails;
+7 no accepted branch after stub attempts; 8 one or more hooks installed.
+NEAR TOTAL/MAX measured before optional allocations. STATE 4 prints first
+two secure words as WORD ZERO/ONE to identify a rejected locator signature.
+Otherwise SITE/STUB identify final attempted pair. Publish only after all
+accepted stubs are written. No new IRQ edits or modified loader handoff.
+Hardware pending: photograph, A, verify boot and menu-only hotkey, fallback
+race if necessary, Pico navigation and relaunch. Deliver DSPico_Test_120.zip.

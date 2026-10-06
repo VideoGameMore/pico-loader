@@ -2,6 +2,9 @@
 extern u32 retailReturnWaitHookCount;
 extern u32 retailReturnWaitSite;
 extern u32 retailReturnWaitStub;
+extern u32 retailReturnWaitState;
+extern u32 retailReturnNearbyTotal;
+extern u32 retailReturnNearbyMax;
 #include <libtwl/mem/memVram.h>
 #include <libtwl/gfx/gfx.h>
 #include <libtwl/gfx/gfxStatus.h>
@@ -173,13 +176,14 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
 {
     mem_setVramEMapping(MEM_VRAM_E_MAIN_BG_00000);
     fastClear((void*)GFX_BG_MAIN, 0x10000);
-    drawPatchText("TEST 119 PATCH SPACE", 8, 4);
-    drawPatchValue("BEFORE TOTAL ", beforeTotal, 28);
-    drawPatchValue("SITE ", retailReturnWaitSite, 48);
-    drawPatchValue("AFTER TOTAL ", afterTotal, 68);
-    drawPatchValue("AFTER MAX ", afterLargest, 88);
-    drawPatchValue("STUB ", retailReturnWaitStub, 116);
-    drawPatchValue("WAIT HOOKS ", retailReturnWaitHookCount, 140);
+    drawPatchText("TEST 120 WAIT INSTALL", 8, 4);
+    drawPatchValue("STATE ", retailReturnWaitState, 24);
+    drawPatchValue("NEAR TOTAL ", retailReturnNearbyTotal, 44);
+    drawPatchValue("NEAR MAX ", retailReturnNearbyMax, 64);
+    drawPatchValue("AFTER TOTAL ", afterTotal, 84);
+    drawPatchValue(retailReturnWaitState == 4 ? "WORD ZERO " : "SITE ", retailReturnWaitSite, 104);
+    drawPatchValue(retailReturnWaitState == 4 ? "WORD ONE " : "STUB ", retailReturnWaitStub, 124);
+    drawPatchValue("WAIT HOOKS ", retailReturnWaitHookCount, 144);
     drawPatchText("PHOTO THEN PRESS A", 8, 168);
 
     waitForVBlank();

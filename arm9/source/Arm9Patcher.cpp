@@ -48,9 +48,14 @@ extern u32 retailReturnFixAddress;
 u32 retailReturnWaitHookCount = 0;
 u32 retailReturnWaitSite = 0;
 u32 retailReturnWaitStub = 0;
+u32 retailReturnWaitState = 0;
+u32 retailReturnNearbyTotal = 0;
+u32 retailReturnNearbyMax = 0;
 
 static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header, bool patchesInParent)
 {
+    retailReturnWaitState = 1;
+    retailReturnNearbyTotal = retailReturnNearbyMax = 0;
     retailReturnWaitHookCount = 0;
     retailReturnWaitSite = retailReturnWaitStub = 0;
     if (!retailReturnTakeoverAddress || !retailReturnFixAddress || header->arm9Size < 0x800)
@@ -69,58 +74,74 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
             continue;
         sites[count++] = &secure[i];
     }
+    retailReturnWaitState = 2;
     if (!count)
         return;
     const u32 codeSize = (SECTION_SIZE(patch_retailreturnwait) + 3) & ~3u;
-    // One optional allocation after all mandatory patches and copies.
-    // Failure leaves every BIOS wrapper untouched.
-    // Test 119: parent-section patches are too far from secure BIOS wrappers.
-    // Only discover a second secure heap when mandatory patches used the
-    // disjoint parent section. Never rediscover already allocated secure space.
     PatchHeap nearbyHeap;
-    PatchHeap* waitHeap = &context.GetPatchHeap();
+    PatchHeap* stubHeap = &context.GetPatchHeap();
     if (patchesInParent)
     {
+        retailReturnWaitState = 3;
         const u32 secureStart = header->arm9LoadAddress;
         if (!((u64)secureStart + 0x800 <= 0x02001000 || secureStart >= 0x02003000))
             return;
         SecureSysCallsUnusedSpaceLocator().FindUnusedSpace(header, nearbyHeap);
-        waitHeap = &nearbyHeap;
+        stubHeap = &nearbyHeap;
     }
-    auto allocation = (u8*)waitHeap->TryAlloc(codeSize + count * 16 + 4);
-    auto block = (u8*)(((u32)allocation + 3) & ~3u);
+    retailReturnNearbyTotal = stubHeap->GetFreeBytes();
+    retailReturnNearbyMax = stubHeap->GetLargestFreeBlock();
+    retailReturnWaitState = 4;
+    if (retailReturnNearbyTotal == 0)
+    {
+        // If the secure locator rejects its signature, show the two words.
+        retailReturnWaitSite = *(const u32*)header->arm9LoadAddress;
+        retailReturnWaitStub = *((const u32*)header->arm9LoadAddress + 1);
+        return;
+    }
+    // Keep ARM checker in the proven heap; only small Thumb stubs need proximity.
+    retailReturnWaitState = 5;
+    auto allocation = (u8*)context.GetPatchHeap().TryAlloc(codeSize + 4);
     if (!allocation)
         return;
+    auto block = (u8*)(((u32)allocation + 3) & ~3u);
     patch_retailreturnwait_fix = retailReturnFixAddress;
     patch_retailreturnwait_takeover = retailReturnTakeoverAddress;
     memcpy(block, SECTION_START(patch_retailreturnwait), SECTION_SIZE(patch_retailreturnwait));
     u32 entry = (u32)block + (u32)patch_retailreturnwait_entry -
         (u32)SECTION_START(patch_retailreturnwait);
+    u16* stubs[4] = {};
+    retailReturnWaitState = 6;
     for (u32 i = 0; i < count; ++i)
     {
-        auto stub = (u16*)(block + codeSize + i * 16);
-        stub[0] = 0xB50F; // push r0-r3,lr
-        stub[1] = 0x4B02; // literal at stub+12
-        stub[2] = 0x4798; // blx r3
-        stub[3] = 0xBC0F; // restore BIOS arguments
-        stub[4] = *sites[i];
-        stub[5] = 0xBD00; // return to original caller
-        *(u32*)&stub[6] = entry;
-    }
-    for (u32 i = 0; i < count; ++i)
-    {
-        u32 stubAddress = (u32)(block + codeSize + i * 16);
-        int delta = (int)stubAddress - (int)sites[i] - 4;
-        if (i == 0 || (delta & 1) || delta < -2048 || delta > 2046)
-        {
-            retailReturnWaitSite = (u32)sites[i];
-            retailReturnWaitStub = stubAddress;
-        }
+        auto stubAllocation = (u8*)stubHeap->TryAlloc(20);
+        if (!stubAllocation)
+            continue;
+        auto stub = (u16*)(((u32)stubAllocation + 3) & ~3u);
+        int delta = (int)stub - (int)sites[i] - 4;
+        retailReturnWaitSite = (u32)sites[i];
+        retailReturnWaitStub = (u32)stub;
         if ((delta & 1) || delta < -2048 || delta > 2046)
-            continue; // leave only this wrapper intact
+            continue;
+        stub[0] = 0xB50F;
+        stub[1] = 0x4B02;
+        stub[2] = 0x4798;
+        stub[3] = 0xBC0F;
+        stub[4] = *sites[i];
+        stub[5] = 0xBD00;
+        *(u32*)&stub[6] = entry;
+        stubs[i] = stub;
+    }
+    // Prepare every accepted stub before publishing any hook.
+    for (u32 i = 0; i < count; ++i)
+    {
+        if (!stubs[i])
+            continue;
+        int delta = (int)stubs[i] - (int)sites[i] - 4;
         *sites[i] = 0xE000 | ((delta >> 1) & 0x7FF);
         ++retailReturnWaitHookCount;
     }
+    retailReturnWaitState = retailReturnWaitHookCount ? 8 : 7;
 
 }
 
