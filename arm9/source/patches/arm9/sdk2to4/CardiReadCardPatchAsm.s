@@ -63,9 +63,6 @@ do_read:
     ldr r3, __patch_cardireadcard_sdread_asm_address
     blx r3
 
-.global patch_cardireadcard_retail_entry
-.thumb_func
-patch_cardireadcard_retail_entry:
 ignore_read:
     // Test 100: acknowledge ARM7, then deliberately park ARM9.
     // Preserve r0 result; r1/r3 restored by the original epilogue.

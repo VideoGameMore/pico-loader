@@ -453,6 +453,23 @@ possible explanation for 110/111 white screens, not a proven root cause.
 Reachability in the tested Mario Kart menu is not established; if wrappers are
 absent or unused, proven cartridge-read return remains the fallback.
 No ARM7 on-disk changes; checksum remains 0x0E2D6140 over 48480 bytes.
-Hardware pending. Verify game boot first, then hotkey on a stationary menu
+Hardware FAIL October 5: same frozen two white screens; game does not boot.
+The BIOS-wait approach has not established boot safety or trigger reachability.
+Verify game boot first, then hotkey on a stationary menu
 without starting a race. If no response, load a race to test 109 fallback.
 Deliver DSPico_Test_112.zip; copy only picoLoader7.bin and picoLoader9.bin.
+
+## Test 113: exact recovery of the hardware-passing Test 109 implementation
+
+Three consecutive menu-trigger experiments (110,111,112) fail before game boot.
+Restore every executable-source difference from Test 109 commit
+255eb29782606c14ed21216a3385cacfd829a7f9: CARDi CPP and assembly; delete the added
+BIOS wait helper. Keep the complete historical test log. No new hook, changed
+trigger, changed allocation, or revised loader is introduced.
+Compile and compare both delivered loader binaries byte-for-byte with the original
+Test 109 hardware-passing artifact. Exact matching binaries make this a baseline
+recovery experiment, not a claim that menu-only return is fixed.
+Test: normal game boot, same hotkey, then race load as in Test 109; expect Pico
+menu with games, followed by successful game relaunch. If exact baseline also
+fails boot, investigate installation/setup or state before further source edits.
+Hardware pending. Deliver DSPico_Test_113.zip; replace only the two loader bins.
