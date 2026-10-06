@@ -425,8 +425,34 @@ the handler returned, not the dispatch index. All returning IRQ handlers can
 check the E request, while patched SD-read activity and ROMCTRL busy checks
 still defer takeover. Keep the working card-read fallback, driver and loaders.
 No ARM7 binary changes or checksum refresh required.
-Hardware pending. First verify boot. Then hold L+R+Down+Select about half a second
+Hardware FAIL October 5: frozen two white screens; game never boots.
+The handler-return change did not restore boot. First verify boot. Then hold L+R+Down+Select about half a second
 on a stationary game menu without starting a race; expect usable Pico menu and
 game relaunch. If boot succeeds but request has no effect, loading a race tests
 whether the proven card-read fallback still returns.
 Deliver DSPico_Test_111.zip; replace only picoLoader7.bin and picoLoader9.bin.
+
+## Test 112: restore Test 109 and check ordinary BIOS wait calls
+
+User notes earlier IRQ/ARM9 attempts already caused boot failures. Stop extending
+that family: remove every Test 110/111 dispatcher/IRQ-return hook and read-active
+flag. Restore Test 109 CARDi code exactly except a zero-size exported takeover
+label. Preserve proven return/relaunch code and real driver.
+SecureSysCallsUnusedSpaceLocator already recognizes and preserves BIOS wait
+wrappers in the first 0x800 bytes: SVC3 WaitByLoop, SVC4 IntrWait with movs r2,#0,
+SVC5 VBlankIntrWait with movs r2,#0, and SVC6 Halt. Find these exact wrappers before
+allocating separate wait code; replace only the SVC halfword with a bounded Thumb
+branch to a separate 16-byte trampoline. The trampoline saves BIOS arguments/LR,
+calls a request checker, restores arguments, executes the original SVC then
+returns to its original caller. Checker preserves registers/condition flags on
+no request and defers while ROMCTRL busy. On E it disables IME, applies existing
+CP15 fix and enters Test 109 takeover. No IRQ vector/dispatcher/table changes.
+Wait helper allocated separately: avoid growing the existing large CARDi block
+inside the fragmented 2 KiB secure-area heap. Heap-fit trouble is another
+possible explanation for 110/111 white screens, not a proven root cause.
+Reachability in the tested Mario Kart menu is not established; if wrappers are
+absent or unused, proven cartridge-read return remains the fallback.
+No ARM7 on-disk changes; checksum remains 0x0E2D6140 over 48480 bytes.
+Hardware pending. Verify game boot first, then hotkey on a stationary menu
+without starting a race. If no response, load a race to test 109 fallback.
+Deliver DSPico_Test_112.zip; copy only picoLoader7.bin and picoLoader9.bin.

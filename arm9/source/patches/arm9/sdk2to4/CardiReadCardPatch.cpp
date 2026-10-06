@@ -11,9 +11,11 @@
 #include "CardiReadCardPatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 extern "C" u32 patch_cardireadcard_loaderParams[65];
-extern "C" void patch_cardireadcard_irq_entry();
-extern "C" u32 patch_cardireadcard_irq_table;
-extern "C" u32 patch_cardireadcard_irq_return;
+DEFINE_SECTION_SYMBOLS(patch_retailreturnwait);
+extern "C" void patch_retailreturnwait_entry();
+extern "C" void patch_cardireadcard_retail_entry();
+extern "C" u32 patch_retailreturnwait_fix;
+extern "C" u32 patch_retailreturnwait_takeover;
 
 static const u32 sCARDiReadCardPatternUnknown[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90D8u };
 static const u32 sCARDiReadCardPatternSdk20029A7[] = { 0xE92D4FF0u, 0xE24DD004u, 0xE1A0A000u, 0xE59F90E0u };
@@ -301,26 +303,57 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     patch_retailhotkeydetect_loaderParamsAddress =
         (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
         (u32)SECTION_START(patch_cardireadcard);
-    // Keep the complete Nitro IRQ dispatcher unchanged. Redirect only its
-    // handler-return literal, so the wrapper runs after the handler finishes.
-    // Autoload copies the literal into place with the unmodified dispatcher.
-    // Unknown implementations retain the working card-read fallback.
-    static const u32 irqDispatchPattern[] =
-        { 0xE59F1008, 0xE7910100, 0xE59FE004, 0xE12FFF10 };
-    u32* irqDispatch = patchContext.FindPattern32(irqDispatchPattern, sizeof(irqDispatchPattern));
-    if (irqDispatch && irqDispatch[4] != 0 && irqDispatch[5] != 0)
-    {
-        patch_cardireadcard_irq_table = irqDispatch[4];
-        patch_cardireadcard_irq_return = irqDispatch[5];
-        u32 irqEntry = (u32)patch1Address + (u32)patch_cardireadcard_irq_entry -
-            (u32)SECTION_START(patch_cardireadcard);
-        irqDispatch[5] = irqEntry; // ldr lr's literal: post-handler wrapper
-        LOG_DEBUG("Retail return IRQ handler-return hook at %p\\n", irqDispatch);
-    }
-    else
-    {
-        LOG_DEBUG("Retail return: IRQ dispatch not found; card-read fallback\\n");
-    }
     memcpy(patch1Address, SECTION_START(patch_cardireadcard), patch1Size);
     memcpy(patch4Address, SECTION_START(fixcp15), patch4Size);
+
+    // Use the existing preserved BIOS wait wrappers in the secure area.
+    // Do not touch any IRQ dispatcher, vector, table, or return target.
+    // Each hook is a 2-byte Thumb branch to a separate 16-byte trampoline.
+    auto romHeader = (const nds_header_ntr_t*)TWL_SHARED_MEMORY->ntrSharedMem.romHeader;
+    u16* waitSites[4] = {};
+    u32 waitCount = 0;
+    u16* secure = (u16*)romHeader->arm9LoadAddress;
+    for (u32 i = 0; i + 1 < 0x800 / 2 && waitCount < 4; i++)
+    {
+        u16 svc = secure[i];
+        if (secure[i + 1] != 0x4770) // bx lr
+            continue;
+        if (svc != 0xDF03 && svc != 0xDF04 && svc != 0xDF05 && svc != 0xDF06)
+            continue;
+        // IntrWait/VBlank wrappers require the recognized preceding movs r2,#0.
+        if ((svc == 0xDF04 || svc == 0xDF05) && (i == 0 || secure[i - 1] != 0x2200))
+            continue;
+        waitSites[waitCount++] = &secure[i];
+    }
+    if (waitCount != 0)
+    {
+        void* waitCode = patchContext.GetPatchHeap().Alloc(SECTION_SIZE(patch_retailreturnwait));
+        patch_retailreturnwait_fix = __patch_cardireadcard_fix_cp15_asm_address;
+        patch_retailreturnwait_takeover = ((u32)patch1Address +
+            ((u32)patch_cardireadcard_retail_entry & ~1u) -
+            (u32)SECTION_START(patch_cardireadcard)) | 1u;
+        memcpy(waitCode, SECTION_START(patch_retailreturnwait), SECTION_SIZE(patch_retailreturnwait));
+        u32 waitEntry = (u32)waitCode + (u32)patch_retailreturnwait_entry -
+            (u32)SECTION_START(patch_retailreturnwait);
+        for (u32 i = 0; i < waitCount; i++)
+        {
+            u16* stub = (u16*)patchContext.GetPatchHeap().Alloc(16);
+            int displacement = (int)stub - (int)waitSites[i] - 4;
+            if ((displacement & 1) || displacement < -2048 || displacement > 2046)
+            {
+                LOG_DEBUG("Retail return: wait branch out of range\\n");
+                continue;
+            }
+            stub[0] = 0xB50F; // push {r0-r3,lr}
+            stub[1] = 0x4B02; // ldr r3,[pc,#8] -> stub+12
+            stub[2] = 0x4798; // blx r3
+            stub[3] = 0xBC0F; // pop {r0-r3}; restore BIOS arguments
+            stub[4] = *waitSites[i]; // original SVC
+            stub[5] = 0xBD00; // pop {pc}; return to original caller
+            *(u32*)&stub[6] = waitEntry; // ARM helper
+            *waitSites[i] = 0xE000 | ((displacement >> 1) & 0x7FF);
+            LOG_DEBUG("Retail return BIOS wait hook at %p\\n", waitSites[i]);
+        }
+    }
+
 }
