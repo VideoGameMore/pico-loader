@@ -549,3 +549,22 @@ Diagnostic adds WAIT HOOKS count; photograph before A. Verify boot then hotkey
 from a stationary game menu without loading a race. If no response, load a race
 to test fallback, then menu navigation and relaunch. Hook reachability and
 hardware behavior pending. Deliver DSPico_Test_117.zip, copy only both bins.
+
+Hardware Test 117 October 5: 1240 before, 20 after, WAIT HOOKS 0. User confirms
+boot and race-triggered fallback return. No wait hook was installed; installer
+allocated 184 bytes then rejected at least one branch. Range rejection is
+established by the code path; exact addresses and reason remain unknown.
+
+## Test 118: individual branch acceptance and address diagnostics
+
+Keep the working return and same 120-byte wait checker. Reserve four extra
+bytes and align checker/stubs to four bytes (required for ARM instructions
+and Thumb PC-relative literals). Maximum optional request is 188 bytes,
+within measured 204. Build all stubs before publishing any wrapper branch.
+Accept each in-range even branch individually; an unreachable wrapper no
+longer cancels all four. Never bypass the range check. Show decimal SITE and
+STUB addresses for the last rejected pair, or first pair if none rejected.
+Diagnostic keeps installed WAIT HOOKS and remaining capacity. This tests
+placement and installs only branches the encoder can represent.
+Hardware pending. Photograph before A, verify boot, menu-only hotkey and
+fallback race if necessary. Deliver DSPico_Test_118.zip, copy both bins only.

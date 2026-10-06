@@ -46,10 +46,13 @@ extern "C" u32 patch_retailreturnwait_takeover;
 extern u32 retailReturnTakeoverAddress;
 extern u32 retailReturnFixAddress;
 u32 retailReturnWaitHookCount = 0;
+u32 retailReturnWaitSite = 0;
+u32 retailReturnWaitStub = 0;
 
 static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t* header)
 {
     retailReturnWaitHookCount = 0;
+    retailReturnWaitSite = retailReturnWaitStub = 0;
     if (!retailReturnTakeoverAddress || !retailReturnFixAddress || header->arm9Size < 0x800)
         return;
     u16* sites[4] = {};
@@ -71,15 +74,10 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
     const u32 codeSize = (SECTION_SIZE(patch_retailreturnwait) + 3) & ~3u;
     // One optional allocation after all mandatory patches and copies.
     // Failure leaves every BIOS wrapper untouched.
-    auto block = (u8*)context.GetPatchHeap().TryAlloc(codeSize + count * 16);
-    if (!block)
+    auto allocation = (u8*)context.GetPatchHeap().TryAlloc(codeSize + count * 16 + 4);
+    auto block = (u8*)(((u32)allocation + 3) & ~3u);
+    if (!allocation)
         return;
-    for (u32 i = 0; i < count; ++i)
-    {
-        int delta = (int)(block + codeSize + i * 16) - (int)sites[i] - 4;
-        if ((delta & 1) || delta < -2048 || delta > 2046)
-            return; // no hook has been published
-    }
     patch_retailreturnwait_fix = retailReturnFixAddress;
     patch_retailreturnwait_takeover = retailReturnTakeoverAddress;
     memcpy(block, SECTION_START(patch_retailreturnwait), SECTION_SIZE(patch_retailreturnwait));
@@ -98,10 +96,19 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
     }
     for (u32 i = 0; i < count; ++i)
     {
-        int delta = (int)(block + codeSize + i * 16) - (int)sites[i] - 4;
+        u32 stubAddress = (u32)(block + codeSize + i * 16);
+        int delta = (int)stubAddress - (int)sites[i] - 4;
+        if (i == 0 || (delta & 1) || delta < -2048 || delta > 2046)
+        {
+            retailReturnWaitSite = (u32)sites[i];
+            retailReturnWaitStub = stubAddress;
+        }
+        if ((delta & 1) || delta < -2048 || delta > 2046)
+            continue; // leave only this wrapper intact
         *sites[i] = 0xE000 | ((delta >> 1) & 0x7FF);
+        ++retailReturnWaitHookCount;
     }
-    retailReturnWaitHookCount = count;
+
 }
 
 #define PARENT_SECTION_START    0x02001000
