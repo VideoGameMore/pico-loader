@@ -571,9 +571,9 @@ fallback race if necessary. Deliver DSPico_Test_118.zip, copy both bins only.
 
 Hardware Test 118 October 5 photo: before 1240, after total/max 16,
 SITE 33556378 (0x0200079A), STUB 33566684 (0x02002FDC), WAIT HOOKS 0.
-Branch displacement is 11302 (stub-site-4), beyond +2046. Required patches
+Branch displacement is 10302 (stub-site-4), beyond +2046. Required patches
 are in the existing .parent area, not adjacent to secure BIOS wrappers.
-Photo establishes placement failure; boot/fallback result not yet reported.
+Photo establishes placement failure. User subsequently confirms boot and race load closes the game.
 
 ## Test 119: nearby optional secure heap when required patches use parent
 
