@@ -1,4 +1,5 @@
 #include "common.h"
+#include "sections.h"
 extern u32 retailReturnHeapBeforeTotal;
 extern u32 retailReturnHeapBeforeLargest;
 #include "ModuleParamsLocator.h"
