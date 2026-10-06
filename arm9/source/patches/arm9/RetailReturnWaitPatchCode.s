@@ -8,6 +8,10 @@ patch_retailreturnwait_entry:
     stmdb sp!, {r0-r3,r12,lr}
     mrs r2, cpsr
     stmdb sp!, {r2,r3}
+    // Only take over from a game thread in system mode, never an IRQ/SVC context.
+    and r3, r2, #0x1F
+    cmp r3, #0x1F
+    bne waitReturn
     ldr r0, waitIpc
     ldrh r1, [r0]
     and r1, r1, #15

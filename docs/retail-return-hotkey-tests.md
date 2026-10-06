@@ -685,3 +685,34 @@ wait calls are absent from every game or that installed hooks are reached.
 Hardware pending: photo, press A, verify boot, then menu hotkey while moving
 through menus. If no immediate return, race fallback; verify usable Pico.
 Deliver DSPico_Test_122.zip; replace only picoLoader7.bin and picoLoader9.bin.
+
+Hardware Test 122 October 6: STATE8, nearby1936/max128, parent after80,
+THUMB4, ARM0, AUTO0. User confirms unchanged boot and race-triggered exit.
+The relocated BIOS wrapper search installed no additional trigger.
+
+## Test 123: intercept inline CP15 wait-for-interrupt instructions
+
+Pivot from ARM BIOS wrapper searches (121/122 installed none) to the distinct
+ARM9 CP15 idle instruction MCR p15,0,Rd,c7,c0,4. Its use as wait-for-interrupt
+is confirmed by devkitPro/calico include/calico/arm/common.h armWaitForIrq.
+This does not establish that Mario Kart's menu executes it; hardware counts
+and behavior must establish presence, installation and reachability separately.
+Scan the decompressed ARM9 image after secure0x800 for exact unconditional
+encoding 0xEE070F90 with Rd nibble masked; reject Rd=PC. Count all matches;
+accept up to four sites with contiguous initial/final mapping and the same
+restricted ITCM/main-RAM autoload destinations as122. Use final PCs for branches.
+Each aligned36-byte reservation holds32 bytes: push r0-r3,r12,LR, call existing
+request checker, restore registers, execute original MCR with original operand,
+then LDR PC to final site+4. Inline code resumes its successor, not caller LR.
+Prepare stubs before publishing single-instruction non-linking branches;
+retain signed32MiB bounds and nonfatal allocation.
+Add a system-mode-only guard to the checker, saving/restoring condition flags
+as before. IRQ/SVC contexts always follow normal original idle/wait behavior.
+Checker grows120 to132 bytes; parent optional reservation136 leaves68 bytes
+on the previously measured204-byte residual heap. Stubs use fragmented secure
+space individually. Required552-byte CARDi and on-disk ARM7 unchanged.
+No IRQ/vector/dispatcher edits. Existing race-read return remains the fallback.
+Diagnostic HALT SITES is recognized instruction count; HALT HOOKS is installed
+count. Neither proves menu execution. Hardware pending: photo then A, game boot,
+hotkey while navigating menus, fallback race if needed, usable Pico and relaunch.
+Deliver DSPico_Test_123.zip; copy only picoLoader7.bin and picoLoader9.bin.

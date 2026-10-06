@@ -48,6 +48,8 @@ extern u32 retailReturnFixAddress;
 u32 retailReturnWaitHookCount = 0;
 u32 retailReturnArmWaitHookCount = 0;
 u32 retailReturnAutoloadWaitHookCount = 0;
+u32 retailReturnHaltSiteCount = 0;
+u32 retailReturnHaltHookCount = 0;
 u32 retailReturnWaitSite = 0;
 u32 retailReturnWaitStub = 0;
 u32 retailReturnWaitState = 0;
@@ -61,6 +63,7 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
     retailReturnWaitHookCount = 0;
     retailReturnArmWaitHookCount = 0;
     retailReturnAutoloadWaitHookCount = 0;
+    retailReturnHaltSiteCount = retailReturnHaltHookCount = 0;
     retailReturnWaitSite = retailReturnWaitStub = 0;
     if (!retailReturnTakeoverAddress || !retailReturnFixAddress || header->arm9Size < 0x800)
         return;
@@ -110,8 +113,34 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
         armRuntimeSites[armCount] = runtime;
         armSites[armCount++] = &words[i];
     }
+    // CP15 wait-for-interrupt can be inline, without any BIOS SVC wrapper.
+    u32* haltSites[4] = {};
+    u32 haltRuntimeSites[4] = {};
+    u32 haltCount = 0;
+    for (u32 i = 0x800 / 4; i + 1 < imageBytes / 4; ++i)
+    {
+        const u32 instruction = words[i];
+        // Unconditional MCR p15,0,Rd,c7,c0,4; never accept Rd=PC.
+        if ((instruction & 0xFFFF0FFF) != 0xEE070F90 ||
+            (instruction & 0xF000) == 0xF000)
+            continue;
+        ++retailReturnHaltSiteCount;
+        if (haltCount == 4)
+            continue;
+        const u32 initial = (u32)&words[i];
+        const u32 runtime = adjuster ? adjuster->AdjustInitialToFinal(initial) : initial;
+        if ((runtime & 3) || (adjuster &&
+            adjuster->AdjustInitialToFinal(initial + 4) != runtime + 4))
+            continue;
+        if (runtime != initial &&
+            !((runtime >= 0x01FF8000 && runtime + 4 < 0x02000000) ||
+              (runtime >= 0x02003000 && runtime + 4 < 0x02400000)))
+            continue;
+        haltRuntimeSites[haltCount] = runtime;
+        haltSites[haltCount++] = &words[i];
+    }
     retailReturnWaitState = 2;
-    if (!count && !armCount)
+    if (!count && !armCount && !haltCount)
         return;
     const u32 codeSize = (SECTION_SIZE(patch_retailreturnwait) + 3) & ~3u;
     PatchHeap nearbyHeap;
@@ -208,7 +237,38 @@ static void installRetailWaitHooks(PatchContext& context, const nds_header_ntr_t
         if (armRuntimeSites[i] != (u32)armSites[i])
             ++retailReturnAutoloadWaitHookCount;
     }
-    retailReturnWaitState = (retailReturnWaitHookCount || retailReturnArmWaitHookCount) ? 8 : 7;
+    // Inline halt must resume at the displaced instruction's successor,
+    // not BX LR: the caller may be in the middle of a larger function.
+    u32* haltStubs[4] = {};
+    for (u32 i = 0; i < haltCount; ++i)
+    {
+        auto allocation = (u8*)stubHeap->TryAlloc(36);
+        if (!allocation)
+            continue;
+        auto stub = (u32*)(((u32)allocation + 3) & ~3u);
+        const int delta = (int)stub - (int)haltRuntimeSites[i] - 8;
+        if ((delta & 3) || delta < -33554432 || delta > 33554428)
+            continue;
+        stub[0] = 0xE92D500F;
+        stub[1] = 0xE59FC00C; // helper literal at stub+24
+        stub[2] = 0xE12FFF3C;
+        stub[3] = 0xE8BD500F; // restore every saved register, including LR
+        stub[4] = *haltSites[i]; // original CP15 halt, original operand
+        stub[5] = 0xE59FF000; // absolute ARM continuation at stub+28
+        stub[6] = entry;
+        stub[7] = haltRuntimeSites[i] + 4;
+        haltStubs[i] = stub;
+    }
+    for (u32 i = 0; i < haltCount; ++i)
+    {
+        if (!haltStubs[i])
+            continue;
+        const int delta = (int)haltStubs[i] - (int)haltRuntimeSites[i] - 8;
+        *haltSites[i] = 0xEA000000 | ((delta >> 2) & 0xFFFFFF);
+        ++retailReturnHaltHookCount;
+    }
+    retailReturnWaitState = (retailReturnWaitHookCount || retailReturnArmWaitHookCount ||
+        retailReturnHaltHookCount) ? 8 : 7;
 
 }
 
