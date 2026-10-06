@@ -1,3 +1,55 @@
+# DSPico QuickReturn
+
+### Back to your games. No reboot required.
+
+Hold **L + R + Down + Select** to return from a retail Nintendo DS game to the Pico menu on DSPico.
+
+**[Download QuickReturn](https://github.com/VideoGameMore/pico-loader/releases/latest)** · **[Installation & full technical writeup](https://github.com/VideoGameMore/pico-loader/releases/tag/build-137)** · **[QuickReturn source](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey)**
+
+## Install
+
+For an existing working DSPico/Pico installation:
+
+1. Power off and back up your current loader files.
+2. Extract `DSPico_Build_137.zip` from the release.
+3. Replace only `picoLoader7.bin` and `picoLoader9.bin` in your existing `/_pico/` folder (or the location your current installation uses).
+4. Safely eject the card and start the console.
+5. Launch a game, then hold **L + R + Down + Select** for approximately half a second to request a return to Pico.
+
+Save your progress in the game before returning. The package updates an existing installation; it does not include a complete firmware or launcher setup.
+
+## What makes QuickReturn work
+
+- Coordinated ARM7/ARM9 return and card-ownership handoff.
+- Storage-driver preservation so Pico retains access to the card.
+- Split return code that fits fragmented game patch memory.
+- Supported wait hooks plus a game-read return fallback.
+- Optional native-reset patches that no longer block boot when memory cannot fit them.
+- DMA shutdown before video-memory remapping during split takeover.
+
+**Current tested release: Build 137.** The loader binaries preserve the working Build 136 return behavior. See the release notes for the development history and validation details.
+
+## Hardware testing
+
+Contra 4 returned from both its menu and gameplay. Named games reported throughout testing also include Pokémon Platinum, Burnout, NFS Undercover and Mega Man ZX. The final hardware report confirmed successful return across the tester's loaded game collection.
+
+Return timing can vary: some games need a subsequent read or transition into gameplay. This is hardware-tested for **DSPico**, not a claim of compatibility with every DS game, DSi mode or other flashcard.
+
+## Open-source foundation
+
+QuickReturn is VideoGameMore's modified version of **[Pico Loader by LNH-team](https://github.com/LNH-team/pico-loader)**. The original loader belongs to its upstream authors and contributors; our work adds and stabilizes the DSPico retail return hotkey.
+
+The original **Zlib license** and copyright notice are retained in [LICENSE.txt](LICENSE.txt). This fork is identified as a modified version, not the upstream release. Additional component licenses remain in [licenses](licenses).
+
+## Source and development
+
+The released QuickReturn implementation is on [`feature/retail-return-hotkey`](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey), and the release tag pins the tested source. The default `develop` branch hosts this project overview and the upstream-derived base; choose the QuickReturn branch when building the hotkey version.
+
+[Read the numbered hardware experiment log](https://github.com/VideoGameMore/pico-loader/blob/feature/retail-return-hotkey/docs/retail-return-hotkey-tests.md).
+
+<details>
+<summary>Original Pico Loader documentation and contributor credits</summary>
+
 # Pico Loader
 Pico Loader is a homebrew and retail DS(i) rom loader supporting a variety of platforms (see below).
 
@@ -14,7 +66,7 @@ Pico Loader is a homebrew and retail DS(i) rom loader supporting a variety of pl
 
 Note that Pico Loader can currently not run retail roms from the DSi SD card. Homebrew is supported, however.
 
-Return to loader is also currently not supported in retail games yet.
+The upstream documentation below describes the original loader. DSPico retail return is provided by the QuickReturn release linked above.
 
 ## Supported platforms
 
@@ -116,3 +168,5 @@ Additional licenses may apply to the project. For details, see the `license` dir
 - [@edo9300](https://github.com/edo9300)
 - [@Tcm0](https://github.com/Tcm0)
 - [@RocketRobz](https://github.com/RocketRobz)
+
+</details>
