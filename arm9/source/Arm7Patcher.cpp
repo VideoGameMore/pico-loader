@@ -20,6 +20,7 @@
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatch.h"
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 #include "Arm7Patcher.h"
+extern u32 retailReturnCardiMode;
 
 static u32 correctAddress(u32 address, const nds_header_ntr_t* romHeader)
 {
@@ -89,7 +90,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
         void* privateWramHeapStart = arm7ArenaPatch->GetArm7PrivateWramArenaLo();
         u32 mainMemoryArenaLo = (u32)arm7ArenaPatch->GetMainMemoryArenaLo();
         // Test 109: reserve persistent game-excluded storage for the real driver.
-        if (cheatsLength == 0)
+        if (cheatsLength == 0 && retailReturnCardiMode == 1)
         {
             patch_retailhotkeydetect_dldiAddress = correctAddress(mainMemoryArenaLo, romHeader);
             mainMemoryArenaLo += 16 * 1024;
@@ -117,7 +118,7 @@ void* Arm7Patcher::ApplyPatches(const LoaderPlatform* loaderPlatform, u32 cheats
             patchCollection.AddPatch(new CheatEnginePatch(cheats));
             mainMemoryArenaLo += cheatsLength;
         }
-        else
+        else if (retailReturnCardiMode == 1)
         {
             patchCollection.AddPatch(new RetailHotkeyDetectionPatch());
         }

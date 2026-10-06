@@ -12,6 +12,7 @@
 #include "patches/arm7/hotkey/RetailHotkeyDetectionPatchCode.h"
 extern "C" u32 patch_cardireadcard_loaderParams[33];
 extern "C" void patch_cardireadcard_retail_entry();
+u32 retailReturnCardiMode = 0; // 1=return-capable, 2=compact boot fallback
 u32 retailReturnTakeoverAddress = 0;
 u32 retailReturnFixAddress = 0;
 u32 retailReturnHeapBeforeTotal = 0;
@@ -131,7 +132,37 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     retailReturnHeapBeforeTotal = patchContext.GetPatchHeap().GetFreeBytes();
     retailReturnHeapBeforeLargest = patchContext.GetPatchHeap().GetLargestFreeBlock();
     u32 patch1Size = SECTION_SIZE(patch_cardireadcard);
-    void* patch1Address = patchContext.GetPatchHeap().Alloc(patch1Size);
+    void* patch1Address = patchContext.GetPatchHeap().TryAlloc(patch1Size);
+    const bool returnCapable = patch1Address != nullptr;
+    const void* patchTemplate = returnCapable ? SECTION_START(patch_cardireadcard) :
+        SECTION_START(patch_cardireadcard_compat);
+    const u32 selectedEntry = returnCapable ? (u32)&patch_cardireadcard_entry :
+        (u32)&patch_cardireadcard_compat_entry;
+    if (!returnCapable)
+    {
+        patch1Size = SECTION_SIZE(patch_cardireadcard_compat);
+        patch1Address = patchContext.GetPatchHeap().Alloc(patch1Size);
+    }
+    retailReturnCardiMode = returnCapable ? 1 : 2;
+    // The same SDK adaptations patch fields in whichever template is selected.
+    u16& patch_cardireadcard_return_offset = returnCapable ?
+        ::patch_cardireadcard_return_offset : ::patch_cardireadcard_compat_return_offset;
+    u16& patch_cardireadcard_mov_src_to_r0 = returnCapable ?
+        ::patch_cardireadcard_mov_src_to_r0 : ::patch_cardireadcard_compat_mov_src_to_r0;
+    u16& patch_cardireadcard_mov_dst_to_r1 = returnCapable ?
+        ::patch_cardireadcard_mov_dst_to_r1 : ::patch_cardireadcard_compat_mov_dst_to_r1;
+    u16& patch_cardireadcard_mov_cardicommon_to_r6 = returnCapable ?
+        ::patch_cardireadcard_mov_cardicommon_to_r6 : ::patch_cardireadcard_compat_mov_cardicommon_to_r6;
+    u16& patch_cardireadcard_adjust_cardicommon_offset = returnCapable ?
+        ::patch_cardireadcard_adjust_cardicommon_offset : ::patch_cardireadcard_compat_adjust_cardicommon_offset;
+    u16& patch_cardireadcard_mov_r3_to_dst = returnCapable ?
+        ::patch_cardireadcard_mov_r3_to_dst : ::patch_cardireadcard_compat_mov_r3_to_dst;
+    u32& __patch_cardireadcard_fix_cp15_asm_address = returnCapable ?
+        ::__patch_cardireadcard_fix_cp15_asm_address : ::__patch_cardireadcard_compat_fix_cp15_asm_address;
+    u32& __patch_cardireadcard_rom_offset_to_sd_sector_asm_address = returnCapable ?
+        ::__patch_cardireadcard_rom_offset_to_sd_sector_asm_address : ::__patch_cardireadcard_compat_rom_offset_to_sd_sector_asm_address;
+    u32& __patch_cardireadcard_sdread_asm_address = returnCapable ?
+        ::__patch_cardireadcard_sdread_asm_address : ::__patch_cardireadcard_compat_sdread_asm_address;
     auto loaderPlatform = patchContext.GetLoaderPlatform();
     if (loaderPlatform->HasRomReads())
     {
@@ -160,7 +191,7 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     void* patch4Address = patchContext.GetPatchHeap().Alloc(patch4Size);
     __patch_cardireadcard_fix_cp15_asm_address = (u32)&fix_cp15_asm - (u32)SECTION_START(fixcp15) + (u32)patch4Address;
 
-    u32 entryAddress = (u32)&patch_cardireadcard_entry - (u32)SECTION_START(patch_cardireadcard) + (u32)patch1Address;
+    u32 entryAddress = selectedEntry - (u32)patchTemplate + (u32)patch1Address;
 
     if (_thumb)
     {
@@ -300,15 +331,19 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
         *(u32*)((u8*)_cardiReadCard + patchOffset + 8) = entryAddress;
     }
 
-    // ARM9 patches finish before ARM7 patches are copied into the game.
-    // Publish the relocated immutable parameter address, not the loader template.
-    patch_retailhotkeydetect_loaderParamsAddress =
-        (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
-        (u32)SECTION_START(patch_cardireadcard);
-    retailReturnTakeoverAddress = ((u32)patch1Address +
-        ((u32)patch_cardireadcard_retail_entry & ~1u) -
-        (u32)SECTION_START(patch_cardireadcard)) | 1u;
-    retailReturnFixAddress = __patch_cardireadcard_fix_cp15_asm_address;
-    memcpy(patch1Address, SECTION_START(patch_cardireadcard), patch1Size);
+    // Never arm ARM7 or install idle hooks against the compact read-only template.
+    patch_retailhotkeydetect_loaderParamsAddress = 0;
+    retailReturnTakeoverAddress = retailReturnFixAddress = 0;
+    if (returnCapable)
+    {
+        patch_retailhotkeydetect_loaderParamsAddress =
+            (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
+            (u32)SECTION_START(patch_cardireadcard);
+        retailReturnTakeoverAddress = ((u32)patch1Address +
+            ((u32)patch_cardireadcard_retail_entry & ~1u) -
+            (u32)SECTION_START(patch_cardireadcard)) | 1u;
+        retailReturnFixAddress = __patch_cardireadcard_fix_cp15_asm_address;
+    }
+    memcpy(patch1Address, patchTemplate, patch1Size);
     memcpy(patch4Address, SECTION_START(fixcp15), patch4Size);
 }

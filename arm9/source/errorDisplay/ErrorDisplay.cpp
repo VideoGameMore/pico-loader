@@ -1,4 +1,6 @@
 #include "common.h"
+extern u32 retailReturnCardiMode;
+extern u32 retailReturnHeapBeforeLargest;
 extern u32 retailReturnPatchStage;
 extern u32 retailReturnFailedAllocation;
 extern u32 retailReturnWaitHookCount;
@@ -184,7 +186,7 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
     fastClear((void*)GFX_BG_MAIN, 0x10000);
     if (retailReturnFailedAllocation)
     {
-        drawPatchText("TEST 124 ALLOC FAIL", 8, 4);
+        drawPatchText("TEST 125 ALLOC FAIL", 8, 4);
         drawPatchValue("CPU STAGE ", retailReturnPatchStage, 28);
         drawPatchValue("NEEDED ", retailReturnFailedAllocation, 52);
         drawPatchValue("FREE TOTAL ", afterTotal, 76);
@@ -193,9 +195,9 @@ void ErrorDisplay::PrintPatchSpaceDiagnostic(u32 beforeTotal, u32 beforeLargest,
     }
     else
     {
-        drawPatchText("TEST 124 HALT INSTALL", 8, 4);
-        drawPatchValue("STATE ", retailReturnWaitState, 24);
-        drawPatchValue("NEAR MAX ", retailReturnNearbyMax, 44);
+        drawPatchText("TEST 125 BOOT MODE", 8, 4);
+        drawPatchValue("RETURN MODE ", retailReturnCardiMode, 24);
+        drawPatchValue("BEFORE MAX ", retailReturnHeapBeforeLargest, 44);
         drawPatchValue("AFTER TOTAL ", afterTotal, 64);
         drawPatchValue("THUMB HOOKS ", retailReturnWaitHookCount, 84);
         drawPatchValue("ARM HOOKS ", retailReturnArmWaitHookCount, 104);

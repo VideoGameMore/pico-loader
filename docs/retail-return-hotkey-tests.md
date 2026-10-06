@@ -749,3 +749,34 @@ white before any readable diagnostic, allocation failure is not established
 by this test; investigate another stage. Then compare one other failing game.
 Mario Kart can verify123 hook behavior unchanged. Do not expect this diagnostic
 build to fix boot by itself. Deliver DSPico_Test_124.zip; replace only both bins.
+
+Hardware Test124 October6 photo: CPU STAGE9, NEEDED552, FREE TOTAL1944,
+FREE MAX124. The photographed game's ARM9 CARDi template allocation fails
+before optional idle hooks or ARM7 detector installation. Its title was not
+included with the photo (Burnout was the requested test); do not assume all
+four games have identical measured failures. Fragmentation is established.
+
+## Test125: compact stock read fallback when the return template cannot fit
+
+Keep the552-byte return template and132-byte idle helper unchanged for games
+where their existing allocation succeeds (Mario Kart's confirmed working path).
+Attempt the552-byte mandatory CARDi block with nonfatal TryAlloc first. On
+failure, allocate the unmodified official v1.7.1 CARDi read template from a
+separate renamed section. It contains only the original read logic and epilogue;
+its exact compiled size must be checked against124's124-byte maximum.
+All existing SDK pattern adaptations, read/remap pointers, CP15 fix, hook offset
+and entry calculations select fields in the chosen template consistently.
+Return mode1=full path,2=compact boot fallback. On fallback publish no return
+parameters/fixer/takeover; optional wait installer therefore skips. ARM7 does
+not reserve the extra16KiB driver buffer or install the large retail hotkey
+patch on that path. Its ordinary storage/save patches and arena reservation
+remain as before. Games without this CARDi hook keep mode0 and no detector.
+No newly claimed RAM, reduced checks or IRQ rewrite. Existing124 allocation
+failure screen remains for any other required patch that does not fit.
+This is a compatibility fallback, not a promise of hotkey return in fragmented
+heaps. Full return still needs a future allocation/layout solution for mode2.
+Diagnostic TEST125 BOOT MODE shows RETURN MODE and BEFORE MAX; A boots normally.
+Hardware pending: Burnout first, photograph mode, A, verify boot/gameplay.
+Mode2 intentionally has no hotkey return. Check other previously failing games,
+and Mario Kart mode1 with gameplay/hotkey/Pico/relaunch regression test.
+Deliver DSPico_Test_125.zip; replace only picoLoader7.bin and picoLoader9.bin.
