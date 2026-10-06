@@ -301,9 +301,10 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
     patch_retailhotkeydetect_loaderParamsAddress =
         (u32)patch1Address + (u32)patch_cardireadcard_loaderParams -
         (u32)SECTION_START(patch_cardireadcard);
-    // Standard Nitro IRQ dispatch tail, also used when no cartridge read occurs.
-    // Patch the pre-autoload bytes; SDK autoload carries this hook into ITCM.
-    // Leave unknown IRQ implementations on the working card-read fallback.
+    // Keep the complete Nitro IRQ dispatcher unchanged. Redirect only its
+    // handler-return literal, so the wrapper runs after the handler finishes.
+    // Autoload copies the literal into place with the unmodified dispatcher.
+    // Unknown implementations retain the working card-read fallback.
     static const u32 irqDispatchPattern[] =
         { 0xE59F1008, 0xE7910100, 0xE59FE004, 0xE12FFF10 };
     u32* irqDispatch = patchContext.FindPattern32(irqDispatchPattern, sizeof(irqDispatchPattern));
@@ -313,11 +314,8 @@ void CardiReadCardPatch::ApplyPatch(PatchContext& patchContext)
         patch_cardireadcard_irq_return = irqDispatch[5];
         u32 irqEntry = (u32)patch1Address + (u32)patch_cardireadcard_irq_entry -
             (u32)SECTION_START(patch_cardireadcard);
-        irqDispatch[0] = 0xE59F1000; // ldr r1, [pc] -> inline relocated address
-        irqDispatch[1] = 0xE12FFF11; // bx r1
-        irqDispatch[2] = irqEntry;
-        irqDispatch[3] = 0xE1A00000; // nop
-        LOG_DEBUG("Retail return VBlank dispatch hook at %p\\n", irqDispatch);
+        irqDispatch[5] = irqEntry; // ldr lr's literal: post-handler wrapper
+        LOG_DEBUG("Retail return IRQ handler-return hook at %p\\n", irqDispatch);
     }
     else
     {

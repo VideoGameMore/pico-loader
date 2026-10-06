@@ -268,13 +268,12 @@ __patch_cardireadcard_sdread_asm_address:
 .global patch_cardireadcard_irq_entry
 .type patch_cardireadcard_irq_entry, %function
 patch_cardireadcard_irq_entry:
-    // Intercept the SDK IRQ dispatch tail. r0 is the selected IRQ index.
-    // Normal dispatch preserves all incoming registers and condition flags.
+    // SDK handlers return here through their original LR literal.
+    // Dispatch instructions and handler selection remain untouched.
+    // Preserve the exact post-handler state before the SDK IRQ epilogue.
     stmdb sp!, {r0-r3,r12,lr}
     mrs r2, cpsr
     stmdb sp!, {r2,r3}
-    cmp r0, #0 // VBlank only; never steal a card/DMA interrupt
-    bne retail_irq_continue
     ldr r1, retail_irq_ipc
     ldrh r2, [r1]
     and r2, r2, #15
@@ -302,11 +301,8 @@ retail_irq_continue:
     ldmia sp!, {r2,r3}
     msr cpsr_f, r2
     ldmia sp!, {r0-r3,r12,lr}
-    // Exact displaced SDK instructions; original table and return literals.
-    ldr r1, patch_cardireadcard_irq_table
-    ldr r0, [r1, r0, lsl #2]
-    ldr lr, patch_cardireadcard_irq_return
-    bx r0
+    // Resume the original SDK IRQ epilogue without changing any register.
+    ldr pc, patch_cardireadcard_irq_return
 retail_irq_ipc:
     .word 0x04000180
 retail_irq_romctrl:

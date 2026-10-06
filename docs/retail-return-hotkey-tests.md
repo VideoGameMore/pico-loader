@@ -406,6 +406,27 @@ On request disable IME and enter masked system mode, apply the existing CP15
 fix and enter the proven card-read epilogue takeover sequence. Existing read
 hook remains a fallback when the standard dispatcher is absent.
 No change to on-disk ARM7 loader or expected 48480-byte checksum.
-Hardware pending. Test from a stationary game menu: hold L+R+Down+Select about
+Hardware FAIL October 5: game does not boot; both screens white.
+Return-trigger behavior could not be tested. Test from a stationary game menu: hold L+R+Down+Select about
 half a second, without starting a race, expect Pico menu and successful relaunch.
 Deliver DSPico_Test_110.zip; copy only picoLoader7.bin and picoLoader9.bin.
+
+## Test 111: preserve dispatcher, intercept only IRQ handler return
+
+Test 110 fails before hotkey use. Its rewritten dispatch tail is not boot-safe
+on the tested game; the specific cause remains unconfirmed.
+Restore all four standard SDK dispatch instructions. Replace only the original
+handler-return literal (the target loaded into LR) with the ARM wrapper address.
+The game selects and invokes its own IRQ handler exactly as before. On handler
+return, wrapper saves/restores post-handler registers and condition flags; the
+normal path loads PC with the preserved original SDK epilogue address without
+modifying any register. Remove IRQ-index-zero check because r0 is now whatever
+the handler returned, not the dispatch index. All returning IRQ handlers can
+check the E request, while patched SD-read activity and ROMCTRL busy checks
+still defer takeover. Keep the working card-read fallback, driver and loaders.
+No ARM7 binary changes or checksum refresh required.
+Hardware pending. First verify boot. Then hold L+R+Down+Select about half a second
+on a stationary game menu without starting a race; expect usable Pico menu and
+game relaunch. If boot succeeds but request has no effect, loading a race tests
+whether the proven card-read fallback still returns.
+Deliver DSPico_Test_111.zip; replace only picoLoader7.bin and picoLoader9.bin.
