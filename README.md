@@ -8,6 +8,8 @@ Hold **L + R + Down + Select** to return from a retail Nintendo DS game to the P
 
 ## Install
 
+**[Watch VideoGameMore’s installation video and QuickReturn demonstration](https://www.youtube.com/watch?v=XmjKz9nq69A)** — installation begins at **4:17**, with testing at **6:28**.
+
 Download **`DSPico_QuickReturn_Full_Build_137.zip`** from the release for a complete SD-card software setup. It includes LNH-team's original Pico Launcher v1.3.0, both themes, the tested QuickReturn loaders, databases, installation notes and license notices.
 
 1. Power off and back up your SD card, including games and saves.
