@@ -70,11 +70,15 @@ Build 137 preserves the functional return code from Build 136 and updates the di
 
 ## Hardware results and limits
 
-Named games reported during the test sequence include Contra 4, Pokémon Platinum, Burnout, NFS Undercover and Mega Man ZX. Contra 4 menu and gameplay return were explicitly confirmed after the Build 136 change. The final report confirmed return success across the tester's loaded collection, without an exhaustive title/region list or a per-game timing table.
+**October 8, 2026 compatibility update:** Rich / VideoGameMore completed a 360-title launch → hotkey return → relaunch baseline on **Nintendo DS Lite with DSPico**. Results: **299 passes (including one delayed return), 57 titles with issues, and 4 unable to test without accessories.** These tests do not establish full gameplay compatibility or support for other console models, DSi modes or other flashcards.
 
-Earlier builds also demonstrated a usable Pico menu and repeated game launches after return. The final broad report did not individually document repeated relaunch cycles for every title. DSi modes and other flashcard platforms are not covered by this hardware confirmation.
+**[Full compatibility table and fix/retest history](https://github.com/VideoGameMore/pico-loader/blob/develop/docs/compatibility.md).** Build 137 results remain the baseline; later fixes will be recorded by build only after hardware retesting. Passes are inferred from the completed alphabetical run under the tester's agreed reporting method, while exceptions are explicit reports.
 
-If reporting a problem, include Build 137, console model, game title and region, whether the hotkey was pressed at a menu or during gameplay, and whether the issue is booting, return, Pico usability or relaunch. Photograph any allocation diagnostic.
+The 57 issues comprise 54 games that boot but ignore the hotkey, Contact's partial return, Animal Crossing returning to an empty Pico game list, and Pokémon Dash's white-screen boot failure. The boot failure has not been isolated against upstream. Yoshi Touch & Go returns during gameplay, but a request before gameplay takes effect at game start. Guitar Hero's three listed titles and Tony Hawk's Motion require unavailable accessories and are excluded from pass/failure counts.
+
+The earlier successful development reports for Contra 4, Pokémon Platinum, Burnout, NFS Undercover and Mega Man ZX remain part of the history; the larger baseline above supersedes any impression that the initial collection proved universal compatibility. The cause of each newly reported issue has not yet been established.
+
+If reporting a problem, include the build, console model, game title and region/revision, menu versus gameplay timing, and whether the issue is booting, return, Pico usability or relaunch. Photograph any allocation diagnostic.
 
 ## Package and source
 
