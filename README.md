@@ -33,11 +33,13 @@ Requires a DSPico cartridge with working firmware. Games, Nintendo BIOS, NAND fi
 
 **Current tested release: Build 137.** The loader binaries preserve the working Build 136 return behavior. See the release notes for the development history and validation details.
 
-## Hardware testing
+## Hardware testing and compatibility
 
-Contra 4 returned from both its menu and gameplay. Named games reported throughout testing also include Pokémon Platinum, Burnout, NFS Undercover and Mega Man ZX. The final hardware report confirmed successful return across the tester's loaded game collection.
+**Tested on Nintendo DS Lite with DSPico.** The completed October 8, 2026 baseline covers 360 titles: **299 passed the launch/return/relaunch check, 57 had issues, and 4 required unavailable accessories.** One passing title, Yoshi Touch & Go, delays a pre-game return request until gameplay starts.
 
-Return timing can vary: some games need a subsequent read or transition into gameplay. This is hardware-tested for **DSPico**, not a claim of compatibility with every DS game, DSi mode or other flashcard.
+**[See the full compatibility table and fix/retest history](docs/compatibility.md).** The table preserves Build 137 results and will record which later build resolves each issue after hardware retesting. Passes inferred from the completed alphabetical test run are identified in the methodology. This is a return/relaunch check, not full gameplay compatibility.
+
+Known issues include games that boot but ignore the hotkey, Contact's partial return, Animal Crossing returning to an empty Pico game list, and Pokémon Dash showing white screens at boot. DSi modes, other console models and other flashcards remain unvalidated by this run.
 
 ## Open-source foundation
 
