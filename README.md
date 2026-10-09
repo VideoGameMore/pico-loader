@@ -4,23 +4,29 @@
 
 Hold **L + R + Down + Select** to return from a retail Nintendo DS game to the Pico menu on DSPico.
 
-**[Download QuickReturn](https://github.com/VideoGameMore/pico-loader/releases/latest)** · **[Installation & full technical writeup](https://github.com/VideoGameMore/pico-loader/releases/tag/build-137)** · **[QuickReturn source](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey)**
+**[Download QuickReturn](https://github.com/VideoGameMore/pico-loader/releases/latest)** · **[Installation & full technical writeup](https://github.com/VideoGameMore/pico-loader/releases/tag/build-139)** · **[QuickReturn source](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey)**
 
-## Install
+## Installation
 
-**[Watch VideoGameMore’s installation video and QuickReturn demonstration](https://www.youtube.com/watch?v=XmjKz9nq69A)** — installation begins at **4:17**, with testing at **6:28**.
+**[Watch the installation video](https://www.youtube.com/watch?v=XmjKz9nq69A)** — installation starts at **4:17**, testing at **6:28**. The current package includes the QuickReturn-branded launcher.
 
-Download **`DSPico_QuickReturn_Full_Build_137.zip`** from the release for a complete SD-card software setup. It includes LNH-team's original Pico Launcher v1.3.0, both themes, the tested QuickReturn loaders, databases, installation notes and license notices.
+Download **`DSPico_QuickReturn_Build_139.zip`** from the [current release](https://github.com/VideoGameMore/pico-loader/releases/latest). It contains the SD-card runtime files: the launcher, loaders, themes and databases. Documentation and source are hosted on GitHub.
 
-1. Power off and back up your SD card, including games and saves.
-2. Extract the ZIP directly to the card root, without an extra enclosing folder.
-3. Confirm `_picoboot.nds` and `_pico/` are at the root. Put your `.nds` games in the root **`nds_games/`** folder.
-4. For an existing installation, merge folders and preserve settings, saves and BIOS files.
-5. Safely eject, boot DSPico and launch a game. Save your progress, then hold **L + R + Down + Select** for approximately half a second to return to Pico.
+### Complete SD-card setup
 
-Requires a DSPico cartridge with working firmware. Games, Nintendo BIOS, NAND files and firmware flashing are not included. The full bundle preserves the exact hardware-tested Build 137 loaders; the assembled package has not had a separate hardware test.
+1. Power off and back up your microSD card, including games and saves.
+2. Extract the ZIP directly to the card root, without an enclosing folder.
+3. Confirm `_picoboot.nds`, `_pico/` and `nds_games/` are at the root. Put your own `.nds` games in `nds_games/`.
+4. When merging into an existing installation, preserve settings, saves and BIOS files.
+5. Safely eject, boot DSPico, launch a game and save. Hold **L + R + Down + Select** for about half a second to request return, then check you can launch another game.
 
-**Updating only the loaders?** Use the smaller `DSPico_Build_137.zip` and replace `picoLoader7.bin` and `picoLoader9.bin` inside your existing `/_pico/` folder.
+Requires a DSPico cartridge with working firmware. Firmware flashing, games, Nintendo BIOS and NAND files are not bundled. Consult upstream instructions for files required by encrypted games or DSiWare.
+
+### Updating an existing QuickReturn installation
+
+Back up and replace root **`_picoboot.nds`** to install the branded launcher. The current ZIP also includes both QuickReturn loaders in `/_pico/`; install them if your setup is not already using the working QuickReturn loaders. Keep filenames and preserve your existing games, saves and settings.
+
+The hotkey does not save progress. Some games defer a return until a supported read or gameplay transition; see the compatibility table.
 
 ## What makes QuickReturn work
 
@@ -31,13 +37,13 @@ Requires a DSPico cartridge with working firmware. Games, Nintendo BIOS, NAND fi
 - Optional native-reset patches that no longer block boot when memory cannot fit them.
 - DMA shutdown before video-memory remapping during split takeover.
 
-**Current tested release: Build 137.** The loader binaries preserve the working Build 136 return behavior. See the release notes for the development history and validation details.
+**Current tested release: Build 139.** Includes the QR-branded Pico splash and VideoGameMore splash with a crossfade. [Read the technical writeup](https://github.com/VideoGameMore/pico-loader/blob/feature/retail-return-hotkey/docs/build-139-release.md).
 
 ## Hardware testing and compatibility
 
-**Tested on Nintendo DS Lite with DSPico.** The completed October 8, 2026 baseline covers 360 titles: **299 passed the launch/return/relaunch check, 57 had issues, and 4 required unavailable accessories.** One passing title, Yoshi Touch & Go, delays a pre-game return request until gameplay starts.
+**Tested on Nintendo DS Lite with DSPico.** The confirmed Build 139 test run covers 360 titles: **299 passed the launch/return/relaunch check, 57 had issues, and 4 required unavailable accessories.** One passing title, Yoshi Touch & Go, delays a pre-game return request until gameplay starts.
 
-**[See the full compatibility table and fix/retest history](docs/compatibility.md).** The table preserves Build 137 results and will record which later build resolves each issue after hardware retesting. Passes inferred from the completed alphabetical test run are identified in the methodology. This is a return/relaunch check, not full gameplay compatibility.
+**[See the full compatibility table and fix/retest history](docs/compatibility.md).** The table preserves Build 139 results and will record which later build resolves each issue after hardware retesting. Passes inferred from the completed alphabetical test run are identified in the methodology. This is a return/relaunch check, not full gameplay compatibility.
 
 Known issues include games that boot but ignore the hotkey, Contact's partial return, Animal Crossing returning to an empty Pico game list, and Pokémon Dash showing white screens at boot. DSi modes, other console models and other flashcards remain unvalidated by this run.
 
