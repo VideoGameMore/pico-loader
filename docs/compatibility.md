@@ -1,6 +1,6 @@
 # DSPico QuickReturn compatibility
 
-[Project home](../README.md) · [Build 139 download and installation](https://github.com/VideoGameMore/pico-loader/releases/tag/build-137) · [LNH-team original Pico Loader](https://github.com/LNH-team/pico-loader)
+[Project home](../README.md) · [Build 139 download and installation](https://github.com/VideoGameMore/pico-loader/releases/tag/build-139) · [LNH-team original Pico Loader](https://github.com/LNH-team/pico-loader)
 
 ## Build 139 baseline — October 8, 2026
 
