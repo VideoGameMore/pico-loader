@@ -1,7 +1,68 @@
+# DSPico QuickReturn
+
+### Back to your games. No reboot required.
+
+Hold **L + R + Down + Select** to return from a retail Nintendo DS game to the Pico menu on DSPico.
+
+**[Download QuickReturn](https://github.com/VideoGameMore/pico-loader/releases/latest)** · **[Installation & full technical writeup](https://github.com/VideoGameMore/pico-loader/releases/tag/build-139)** · **[QuickReturn source](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey)**
+
+## Installation
+
+**[Watch the installation video](https://www.youtube.com/watch?v=XmjKz9nq69A)** — installation starts at **4:17**, testing at **6:28**. The current package includes the QuickReturn-branded launcher.
+
+Download **`DSPico_QuickReturn_Build_139.zip`** from the [current release](https://github.com/VideoGameMore/pico-loader/releases/latest). It contains the SD-card runtime files: the launcher, loaders, themes and databases. Documentation and source are hosted on GitHub.
+
+### Complete SD-card setup
+
+1. Power off and back up your microSD card, including games and saves.
+2. Extract the ZIP directly to the card root, without an enclosing folder.
+3. Confirm `_picoboot.nds`, `_pico/` and `nds_games/` are at the root. Put your own `.nds` games in `nds_games/`.
+4. When merging into an existing installation, preserve settings, saves and BIOS files.
+5. Safely eject, boot DSPico, launch a game and save. Hold **L + R + Down + Select** for about half a second to request return, then check you can launch another game.
+
+Requires a DSPico cartridge with working firmware. Firmware flashing, games, Nintendo BIOS and NAND files are not bundled. Consult upstream instructions for files required by encrypted games or DSiWare.
+
+### Updating an existing QuickReturn installation
+
+Back up and replace root **`_picoboot.nds`** to install the branded launcher. The current ZIP also includes both QuickReturn loaders in `/_pico/`; install them if your setup is not already using the working QuickReturn loaders. Keep filenames and preserve your existing games, saves and settings.
+
+The hotkey does not save progress. Some games defer a return until a supported read or gameplay transition; see the compatibility table.
+
+## What makes QuickReturn work
+
+- Coordinated ARM7/ARM9 return and card-ownership handoff.
+- Storage-driver preservation so Pico retains access to the card.
+- Split return code that fits fragmented game patch memory.
+- Supported wait hooks plus a game-read return fallback.
+- Optional native-reset patches that no longer block boot when memory cannot fit them.
+- DMA shutdown before video-memory remapping during split takeover.
+
+**Current tested release: Build 139.** Includes the QR-branded Pico splash and VideoGameMore splash with a crossfade. [Read the technical writeup](https://github.com/VideoGameMore/pico-loader/blob/feature/retail-return-hotkey/docs/build-139-release.md).
+
+## Hardware testing and compatibility
+
+**Tested on Nintendo DS Lite with DSPico.** The confirmed Build 139 test run covers 360 titles: **299 passed the launch/return/relaunch check, 57 had issues, and 4 required unavailable accessories.** One passing title, Yoshi Touch & Go, delays a pre-game return request until gameplay starts.
+
+**[See the full compatibility table and fix/retest history](docs/compatibility.md).** The table preserves Build 139 results and will record which later build resolves each issue after hardware retesting. Passes inferred from the completed alphabetical test run are identified in the methodology. This is a return/relaunch check, not full gameplay compatibility.
+
+Known issues include games that boot but ignore the hotkey, Contact's partial return, Animal Crossing returning to an empty Pico game list, and Pokémon Dash showing white screens at boot. DSi modes, other console models and other flashcards remain unvalidated by this run.
+
+## Open-source foundation
+
+QuickReturn is VideoGameMore's modified version of **[Pico Loader by LNH-team](https://github.com/LNH-team/pico-loader)**. The original loader belongs to its upstream authors and contributors; our work adds and stabilizes the DSPico retail return hotkey.
+
+The original **Zlib license** and copyright notice are retained in [LICENSE.txt](LICENSE.txt). This fork is identified as a modified version, not the upstream release. Additional component licenses remain in [licenses](licenses).
+
+## Source and development
+
+The released QuickReturn implementation is on [`feature/retail-return-hotkey`](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey), and the release tag pins the tested source. The default `develop` branch hosts this project overview and the upstream-derived base; choose the QuickReturn branch when building the hotkey version.
+
+[Read the numbered hardware experiment log](https://github.com/VideoGameMore/pico-loader/blob/feature/retail-return-hotkey/docs/retail-return-hotkey-tests.md).
+
+<details>
+<summary>Original Pico Loader documentation and contributor credits</summary>
+
 # Pico Loader
-
-This is VideoGameMore's fork of [LNH-team/Pico Loader](https://github.com/LNH-team/pico-loader). Credit for the original loader belongs to its upstream authors and contributors. Our DSPico retail return-hotkey work is described in [Build 137 notes](docs/build-137-release.md).
-
 Pico Loader is a homebrew and retail DS(i) rom loader supporting a variety of platforms (see below).
 
 ## Features
@@ -17,7 +78,7 @@ Pico Loader is a homebrew and retail DS(i) rom loader supporting a variety of pl
 
 Note that Pico Loader can currently not run retail roms from the DSi SD card. Homebrew is supported, however.
 
-This VideoGameMore DSPico fork supports retail-game return with **L + R + Down + Select**. See [Build 137 installation and technical notes](docs/build-137-release.md). This return implementation is hardware-tested on DSPico; other flashcard platforms are not validated.
+The upstream documentation below describes the original loader. DSPico retail return is provided by the QuickReturn release linked above.
 
 ## Supported platforms
 
@@ -119,3 +180,5 @@ Additional licenses may apply to the project. For details, see the `license` dir
 - [@edo9300](https://github.com/edo9300)
 - [@Tcm0](https://github.com/Tcm0)
 - [@RocketRobz](https://github.com/RocketRobz)
+
+</details>
