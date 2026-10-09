@@ -1,10 +1,10 @@
 # DSPico QuickReturn compatibility
 
-[Project home](../README.md) · [Build 137 download and installation](https://github.com/VideoGameMore/pico-loader/releases/tag/build-137) · [LNH-team original Pico Loader](https://github.com/LNH-team/pico-loader)
+[Project home](../README.md) · [Build 139 download and installation](https://github.com/VideoGameMore/pico-loader/releases/tag/build-137) · [LNH-team original Pico Loader](https://github.com/LNH-team/pico-loader)
 
-## Build 137 baseline — October 8, 2026
+## Build 139 baseline — October 8, 2026
 
-Rich / VideoGameMore completed a 360-title test list on **Nintendo DS Lite hardware with DSPico**. The procedure was **launch a game → request return with L + R + Down + Select → launch again**. This checks the return/relaunch cycle, not complete gameplay, save integrity, every menu or every ROM revision. Other console models, DSi modes and other flashcards have not been validated by this run.
+Rich / VideoGameMore tested Build 139 against the complete 360-title list on **Nintendo DS Lite hardware with DSPico**. The procedure was **launch a game → request return with L + R + Down + Select → launch again**. This checks the return/relaunch cycle, not complete gameplay, save integrity, every menu or every ROM revision. Other console models, DSi modes and other flashcards have not been validated by this run.
 
 | Result | Titles |
 | --- | ---: |
@@ -34,9 +34,11 @@ The names and USA region labels below come from the supplied test manifest. File
 - **Guitar Hero: On Tour, Decades and Modern Hits:** unable to test without the Guitar Grip accessory.
 - **Tony Hawk’s Motion:** unable to test without its motion accessory; the hotkey also did not reset from the accessible screen.
 
+The Build 139 retest was confirmed by the tester to reproduce the recorded results. The branded launcher splash also worked on boot and after game return.
+
 ## Fixes and retests
 
-Keep the Build 137 column as the historical baseline. When a later build fixes a title, fill **Fixed in** only after a hardware retest and add the dated test result below, including the build, console, region/revision if known, menu/gameplay timing and relaunch result. A code change alone is not a confirmed compatibility fix. Link the later release or patch notes here. No later fixes have been confirmed yet.
+Keep the Build 139 column as the historical baseline. When a later build fixes a title, fill **Fixed in** only after a hardware retest and add the dated test result below, including the build, console, region/revision if known, menu/gameplay timing and relaunch result. A code change alone is not a confirmed compatibility fix. Link the later release or patch notes here. No later fixes have been confirmed yet.
 
 | Retest date | Game | Build | Hardware | Observation | Release / patch |
 | --- | --- | --- | --- | --- | --- |
@@ -46,7 +48,7 @@ Keep the Build 137 column as the historical baseline. When a later build fixes a
 
 “—” in **Fixed in** means no later fix has been verified. Pass rows use the completed-run evidence described above; exception rows use explicit tester reports.
 
-| Game (manifest name) | Build 137 | Observation | Fixed in |
+| Game (manifest name) | Build 139 | Observation | Fixed in |
 | --- | --- | --- | --- |
 | Advance Wars - Dual Strike | Pass | Launch → hotkey return → relaunch; inferred from completed alphabetical run. | — |
 | Advance Wars Days of Ruin | Pass | Launch → hotkey return → relaunch; inferred from completed alphabetical run. | — |
