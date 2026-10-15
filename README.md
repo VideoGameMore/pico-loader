@@ -6,6 +6,14 @@ Hold **L + R + Down + Select** to return from a retail Nintendo DS game to the P
 
 **[Download QuickReturn](https://github.com/VideoGameMore/pico-loader/releases/latest)** · **[Installation & full technical writeup](https://github.com/VideoGameMore/pico-loader/releases/tag/build-139)** · **[QuickReturn source](https://github.com/VideoGameMore/pico-loader/tree/feature/retail-return-hotkey)**
 
+## Report a bug or share feedback
+
+Found a game that does not launch, a QuickReturn hotkey problem, or an empty game list after returning? **[Submit a QuickReturn bug report](https://github.com/VideoGameMore/pico-loader/issues/new?template=bug_report.yml)**. Include your console, QuickReturn build, game title/region/revision, steps to reproduce, and whether the game works with the original Pico Loader.
+
+Have an improvement idea? **[Share a feature request or general feedback](https://github.com/VideoGameMore/pico-loader/issues/new?template=feedback.yml)**.
+
+Please check [existing reports](https://github.com/VideoGameMore/pico-loader/issues) before posting. Do not upload copyrighted games, BIOS files, or keys.
+
 ## Installation
 
 **[Watch the installation video](https://www.youtube.com/watch?v=XmjKz9nq69A)** — installation starts at **4:17**, testing at **6:28**. The current package includes the QuickReturn-branded launcher.
