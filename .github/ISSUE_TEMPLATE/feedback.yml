@@ -1,0 +1,30 @@
+name: Feature request or general feedback
+description: Suggest an improvement to DSPico QuickReturn
+title: "[Feedback] "
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Feedback type
+      options:
+        - Feature request
+        - Usability / interface
+        - Documentation
+        - Compatibility suggestion
+        - General feedback
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Why would it help?
+  - type: input
+    id: version
+    attributes:
+      label: QuickReturn build (if relevant)
