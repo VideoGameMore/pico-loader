@@ -1,0 +1,87 @@
+name: Bug report
+description: Report a QuickReturn game compatibility, launcher, or installation problem
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for helping test DSPico QuickReturn! Please check existing reports before submitting. Do not upload copyrighted ROMs or BIOS files."
+  - type: input
+    id: qr_version
+    attributes:
+      label: QuickReturn version / build
+      placeholder: "Build 139"
+    validations:
+      required: true
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Console
+      options:
+        - DS Lite
+        - Original DS
+        - DSi / DSi XL
+        - 3DS / 3DS XL
+        - New 3DS / New 3DS XL
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Console system version (if applicable)
+      placeholder: "11.17.0-50U"
+  - type: input
+    id: game
+    attributes:
+      label: Game and region / revision
+      placeholder: "Animal Crossing: Wild World (USA) (Rev 1)"
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What went wrong?
+      options:
+        - Game will not boot / black screen
+        - Game boots but gameplay fails
+        - QuickReturn hotkey does not work
+        - Return shows empty launcher / missing game list
+        - Return freezes or crashes
+        - Installation or update problem
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Explain what you did, including whether you used the return hotkey.
+      placeholder: "1. Launch game\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: upstream
+    attributes:
+      label: Does the same game work with original Pico Loader / PicoMenu?
+      description: If tested, compare with the same SD card and game dump.
+  - type: textarea
+    id: setup
+    attributes:
+      label: SD card and installation details
+      description: Note whether you installed the complete ZIP or only replaced some files, plus any custom themes or settings.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots, logs, or other notes
+      description: Drag and drop screenshots here; do not post ROMs, BIOS, keys, or personal information.
